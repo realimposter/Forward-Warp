@@ -72,6 +72,7 @@ __global__ void forward_warp_cuda_forward_kernel(
                 }
             }
         }
+    }
   }
 }
 
