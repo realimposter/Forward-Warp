@@ -59,10 +59,10 @@ __global__ void forward_warp_cuda_forward_kernel(
                 const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
                 scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
                 for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W){
-                    atomicExch(im1_p,     nw_k*(*im0_p));
-                    atomicExch(im1_p+1,   ne_k*(*im0_p));
-                    atomicExch(im1_p+W,   sw_k*(*im0_p));
-                    atomicExch(im1_p+W+1, se_k*(*im0_p));
+                    atomicAdd(im1_p,     nw_k*(*im0_p));
+                    atomicAdd(im1_p+1,   ne_k*(*im0_p));
+                    atomicAdd(im1_p+W,   sw_k*(*im0_p));
+                    atomicAdd(im1_p+W+1, se_k*(*im0_p));
                 }
             }
             } 
