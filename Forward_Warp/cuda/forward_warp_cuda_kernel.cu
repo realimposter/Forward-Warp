@@ -26,6 +26,7 @@ __global__ void forward_warp_cuda_forward_kernel(
     const int total_step,
     const scalar_t* im0,
     const scalar_t* flow,
+    const scalar_t* sort,
     scalar_t* im1,
     const int B,
     const int C,
