@@ -27,13 +27,12 @@ __global__ void forward_warp_cuda_forward_kernel(
     const scalar_t* im0,
     const scalar_t* flow,
     scalar_t* im1,
+    scalar_t* sort,
     const int B,
     const int C,
     const int H,
     const int W,
     const GridSamplerInterpolation interpolation_mode) {
-  // CUDA_KERNEL_LOOP(index, total_step-1) {
-  // bug fix, thx to @tkkcc
   CUDA_KERNEL_LOOP(index, total_step) {
     const int b = index / (H * W);
     const int h = (index-b*H*W) / W;
@@ -57,6 +56,25 @@ __global__ void forward_warp_cuda_forward_kernel(
             atomicAdd(im1_p+1,   ne_k*(*im0_p));
             atomicAdd(im1_p+W,   sw_k*(*im0_p));
             atomicAdd(im1_p+W+1, se_k*(*im0_p));
+        scalar_t* sort_p = sort+get_im_index(b, 0, y_f, x_f, C, H, W);
+        for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W, sort_p+=H*W){
+          const scalar_t curr_sort = *sort_p;
+          if (curr_sort < nw_k) {
+            *sort_p = nw_k;
+            *im1_p = nw_k * (*im0_p);
+          }
+          if (curr_sort < ne_k) {
+            *sort_p = ne_k;
+            *(im1_p+1) = ne_k * (*im0_p);
+          }
+          if (curr_sort < sw_k) {
+            *sort_p = sw_k;
+            *(im1_p+W) = sw_k * (*im0_p);
+          }
+          if (curr_sort < se_k) {
+            *sort_p = se_k;
+            *(im1_p+W+1) = se_k * (*im0_p);
+          }
         }
       }
     } 
@@ -67,7 +85,13 @@ __global__ void forward_warp_cuda_forward_kernel(
         const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
         scalar_t* im1_p = im1+get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
         for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W) {
+        scalar_t* sort_p = sort+get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
+        for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W, sort_p += H*W) {
+          const scalar_t curr_sort = *sort_p;
+          if (curr_sort < 1) {
+            *sort_p = 1;
             *im1_p = *im0_p;
+          }
         }
       }
     }
