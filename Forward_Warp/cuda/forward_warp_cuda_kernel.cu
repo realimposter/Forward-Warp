@@ -59,7 +59,6 @@ __global__ void forward_warp_cuda_forward_kernel(
             atomicAdd(im1_p+W,   sw_k*(*im0_p));
             atomicAdd(im1_p+W+1, se_k*(*im0_p));
         }
-        scalar_t* sort_p = sort+get_im_index(b, 0, y_f, x_f, C, H, W);
       }
     } 
     else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
