@@ -59,23 +59,10 @@ __global__ void forward_warp_cuda_forward_kernel(
                     const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
                     scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
                     for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W){
-                        int new_val;
-
-                        new_val = static_cast<int>(nw_k*(*im0_p));
-                        atomicExch((int*)im1_p, new_val);
-                        *im1_p = static_cast<scalar_t>(*im1_p);
-
-                        new_val = static_cast<int>(ne_k*(*im0_p));
-                        atomicExch((int*)(im1_p+1), new_val);
-                        *(im1_p+1) = static_cast<scalar_t>(*(im1_p+1));
-
-                        new_val = static_cast<int>(sw_k*(*im0_p));
-                        atomicExch((int*)(im1_p+W), new_val);
-                        *(im1_p+W) = static_cast<scalar_t>(*(im1_p+W));
-
-                        new_val = static_cast<int>(se_k*(*im0_p));
-                        atomicExch((int*)(im1_p+W+1), new_val);
-                        *(im1_p+W+1) = static_cast<scalar_t>(*(im1_p+W+1));
+                        atomicExch(im1_p,     nw_k*(*im0_p));
+                        atomicExch(im1_p+1,   ne_k*(*im0_p));
+                        atomicExch(im1_p+W,   sw_k*(*im0_p));
+                        atomicExch(im1_p+W+1, se_k*(*im0_p));
                     }
                 }
             } 
@@ -175,13 +162,13 @@ at::Tensor forward_warp_cuda_forward(
   const int W = im0.size(3);
   const int total_step = B * H * W;
   AT_DISPATCH_FLOATING_TYPES(im0.scalar_type(), "forward_warp_forward_cuda", ([&] {
-    forward_warp_cuda_forward_kernel<scalar_t>
+    forward_warp_cuda_forward_kernel<float>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      im0.data<scalar_t>(),
-      flow.data<scalar_t>(),
-      im1.data<scalar_t>(),
-      sort.data<scalar_t>(),
+      static_cast<const float*>(im0.data_ptr()),
+      static_cast<const float*>(flow.data_ptr()),
+      static_cast<float*>(im1.data_ptr()),
+      static_cast<float*>(sort.data_ptr()),
       B, C, H, W,
       interpolation_mode);
   }));
