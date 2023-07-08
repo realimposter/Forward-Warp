@@ -59,22 +59,22 @@ __global__ void forward_warp_cuda_forward_kernel(
                     const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
                     scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
                     for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W){
-                        float new_val;
+                        int new_val;
 
-                        new_val = static_cast<float>(nw_k*(*im0_p));
-                        atomicExch((float*)im1_p, new_val);
+                        new_val = static_cast<int>(nw_k*(*im0_p));
+                        atomicExch((int*)im1_p, new_val);
                         *im1_p = static_cast<scalar_t>(*im1_p);
 
-                        new_val = static_cast<float>(ne_k*(*im0_p));
-                        atomicExch((float*)(im1_p+1), new_val);
+                        new_val = static_cast<int>(ne_k*(*im0_p));
+                        atomicExch((int*)(im1_p+1), new_val);
                         *(im1_p+1) = static_cast<scalar_t>(*(im1_p+1));
 
-                        new_val = static_cast<float>(sw_k*(*im0_p));
-                        atomicExch((float*)(im1_p+W), new_val);
+                        new_val = static_cast<int>(sw_k*(*im0_p));
+                        atomicExch((int*)(im1_p+W), new_val);
                         *(im1_p+W) = static_cast<scalar_t>(*(im1_p+W));
 
-                        new_val = static_cast<float>(se_k*(*im0_p));
-                        atomicExch((float*)(im1_p+W+1), new_val);
+                        new_val = static_cast<int>(se_k*(*im0_p));
+                        atomicExch((int*)(im1_p+W+1), new_val);
                         *(im1_p+W+1) = static_cast<scalar_t>(*(im1_p+W+1));
                     }
                 }
