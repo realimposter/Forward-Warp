@@ -203,8 +203,8 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W,
       interpolation_mode);
   }));
-  // Divide warped main image by warped white image
-  im1.div_(white_im1);
+  // Divide warped main image by warped white image * 255
+  im1.div_(white_im1*255);
   return im1;
 }
 
