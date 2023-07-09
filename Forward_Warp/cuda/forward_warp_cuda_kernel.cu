@@ -25,7 +25,7 @@ template <typename scalar_t>
 __global__ void forward_warp_cuda_forward_kernel(
     const int total_step,
     const scalar_t* im0,
-    const scalar_t* flow,
+    scalar_t* flow,
     scalar_t* im1,
     scalar_t* sort,
     const int B,
@@ -33,7 +33,7 @@ __global__ void forward_warp_cuda_forward_kernel(
     const int H,
     const int W,
     const GridSamplerInterpolation interpolation_mode) {
-    int kernel_size = 1; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    int dilate_radius = 1; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
