@@ -66,7 +66,7 @@ __global__ void forward_warp_cuda_forward_kernel(
             flow[index*2+1] = flow[largest_loc*2+1];
         }
 
-        if (current_flow_amplitude > sort[index]) {
+        // if (current_flow_amplitude > sort[index]) {
             sort[index] = current_flow_amplitude;
             if (interpolation_mode == GridSamplerInterpolation::Bilinear) {
                 const int x_f = static_cast<int>(::floor(x));
@@ -106,7 +106,7 @@ __global__ void forward_warp_cuda_forward_kernel(
                     }
                 }
             }
-        }
+        // }
     }
 }
 
