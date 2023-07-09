@@ -25,8 +25,10 @@ template <typename scalar_t>
 __global__ void forward_warp_cuda_forward_kernel(
     const int total_step,
     const scalar_t* im0,
+    const scalar_t* white_im0,
     scalar_t* flow,
     scalar_t* im1,
+    scalar_t* white_im1,
     scalar_t* sort,
     const int B,
     const int C,
@@ -86,6 +88,15 @@ __global__ void forward_warp_cuda_forward_kernel(
                         atomicAdd(im1_p+W,   sw_k*(*im0_p));
                         atomicAdd(im1_p+W+1, se_k*(*im0_p));
                     }
+
+                    const scalar_t* white_im0_p = white_im0+get_im_index(b, 0, h, w, C, H, W);
+                    scalar_t* white_im1_p = white_im1+get_im_index(b, 0, y_f, x_f, C, H, W);
+                    for (int c = 0; c < C; ++c, white_im0_p+=H*W, white_im1_p+=H*W){
+                        atomicAdd(white_im1_p,     nw_k*(*white_im0_p));
+                        atomicAdd(white_im1_p+1,   ne_k*(*white_im0_p));
+                        atomicAdd(white_im1_p+W,   sw_k*(*white_im0_p));
+                        atomicAdd(white_im1_p+W+1, se_k*(*white_im0_p));
+                    }
                 }
             } 
             else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
@@ -97,6 +108,12 @@ __global__ void forward_warp_cuda_forward_kernel(
                     for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W) {
                         *im1_p = *im0_p;
                     }
+                }
+
+                const scalar_t* white_im0_p = white_im0+get_im_index(b, 0, h, w, C, H, W);
+                scalar_t* white_im1_p = white_im1+get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
+                for (int c = 0; c < C; ++c, white_im0_p += H*W, white_im1_p += H*W) {
+                    *white_im1_p = *white_im0_p;
                 }
             }
         }
@@ -173,10 +190,12 @@ __global__ void forward_warp_cuda_backward_kernel(
 }
 
 at::Tensor forward_warp_cuda_forward(
-    const at::Tensor im0, 
+    const at::Tensor im0,
+    const at::Tensor white_im0, // added white image
     const at::Tensor flow,
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
+  auto white_im1 = at::zeros_like(white_im0); // added warped white image
   auto sort = at::zeros({im0.size(0), im0.size(2), im0.size(3)}, im0.options());  // Create the sort tensor with the same device and dtype as im0.
   const int B = im0.size(0);
   const int C = im0.size(1);
@@ -188,13 +207,16 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       im0.data<scalar_t>(),
+      white_im0.data<scalar_t>(), // added white image
       flow.data<scalar_t>(),
       im1.data<scalar_t>(),
+      white_im1.data<scalar_t>(), // added warped white image
       sort.data<scalar_t>(),
       B, C, H, W,
       interpolation_mode);
   }));
-
+  // Divide warped main image by warped white image
+  im1.div_(white_im1);
   return im1;
 }
 
