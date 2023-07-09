@@ -206,9 +206,8 @@ at::Tensor forward_warp_cuda_forward(
   // Divide warped main image by warped white image * 255
   im1.div_(white_im1);
   // if any pixels are greater than 255, set them to NAN
-  im1.masked_fill_(im1 > 255, NAN);
   // cap image to 255
-  return im1;
+  return white_im1;
 }
 
 std::vector<at::Tensor> forward_warp_cuda_backward(
