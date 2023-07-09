@@ -33,7 +33,7 @@ __global__ void forward_warp_cuda_forward_kernel(
     const int H,
     const int W,
     const GridSamplerInterpolation interpolation_mode) {
-    int dilate_radius = 2; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    int dilate_radius = 3; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
@@ -57,7 +57,7 @@ __global__ void forward_warp_cuda_forward_kernel(
 
         // Check if the largest_flow_amplitude is more than 4 greater than current pixel amplitude
         const scalar_t current_flow_amplitude = hypotf(flow[index*2+0], flow[index*2+1]);
-        if ((largest_flow_amplitude - current_flow_amplitude) > 3) {
+        if ((largest_flow_amplitude - current_flow_amplitude) > 2) {
             // Update flow
             flow[index*2+0] = flow[largest_loc*2+0];
             flow[index*2+1] = flow[largest_loc*2+1];
