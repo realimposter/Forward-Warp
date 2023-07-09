@@ -28,13 +28,12 @@ __global__ void forward_warp_cuda_forward_kernel(
     scalar_t* flow,
     scalar_t* im1,
     scalar_t* white_im1,
-    scalar_t* sort,
     const int B,
     const int C,
     const int H,
     const int W,
     const GridSamplerInterpolation interpolation_mode) {
-    int dilate_radius = 2; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    int dilate_radius = 1; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
@@ -60,53 +59,52 @@ __global__ void forward_warp_cuda_forward_kernel(
 
         // Check if the largest_flow_amplitude is more than 2 greater than current pixel amplitude
         const scalar_t current_flow_amplitude = hypotf(flow[index*2+0], flow[index*2+1]);
-        if ((largest_flow_amplitude - current_flow_amplitude) > 2) {
+        if ((largest_flow_amplitude - current_flow_amplitude) > 1) {
             // Update flow
             flow[index*2+0] = flow[largest_loc*2+0];
             flow[index*2+1] = flow[largest_loc*2+1];
         }
 
-        // if (current_flow_amplitude > sort[index]) {
-            sort[index] = current_flow_amplitude;
-            if (interpolation_mode == GridSamplerInterpolation::Bilinear) {
-                const int x_f = static_cast<int>(::floor(x));
-                const int y_f = static_cast<int>(::floor(y));
-                const int x_c = x_f + 1;
-                const int y_c = y_f + 1;
-                if(x_f>=0 && x_c<W && y_f>=0 && y_c<H){
-                    const scalar_t nw_k = (x_c - x) * (y_c - y);
-                    const scalar_t ne_k = (x - x_f) * (y_c - y);
-                    const scalar_t sw_k = (x_c - x) * (y - y_f);
-                    const scalar_t se_k = (x - x_f) * (y - y_f);
-                    const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
-                    scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
-                    scalar_t* white_im1_p = white_im1+get_im_index(b, 0, y_f, x_f, C, H, W); // added warped white image
-                    for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W, white_im1_p+=H*W){
-                        atomicAdd(im1_p,     nw_k*(*im0_p));
-                        atomicAdd(im1_p+1,   ne_k*(*im0_p));
-                        atomicAdd(im1_p+W,   sw_k*(*im0_p));
-                        atomicAdd(im1_p+W+1, se_k*(*im0_p));
-                        atomicAdd(white_im1_p,     nw_k); // added warped white image
-                        atomicAdd(white_im1_p+1,   ne_k); // added warped white image
-                        atomicAdd(white_im1_p+W,   sw_k); // added warped white image
-                        atomicAdd(white_im1_p+W+1, se_k); // added warped white image
-                    }
-                }
-            } 
-            else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-                const int x_nearest = static_cast<int>(::round(x));
-                const int y_nearest = static_cast<int>(::round(y));
-                if (x_nearest >= 0 && x_nearest < W && y_nearest >= 0 && y_nearest < H) {
-                    const scalar_t* im0_p = im0 + get_im_index(b, 0, h, w, C, H, W);
-                    scalar_t* im1_p = im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
-                    scalar_t* white_im1_p = white_im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W); // added warped white image
-                    for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W, white_im1_p += H*W) {
-                        *im1_p = *im0_p;
-                        *white_im1_p = 1; // set pixel value to 1 for the warped white image
-                    }
+
+        if (interpolation_mode == GridSamplerInterpolation::Bilinear) {
+            const int x_f = static_cast<int>(::floor(x));
+            const int y_f = static_cast<int>(::floor(y));
+            const int x_c = x_f + 1;
+            const int y_c = y_f + 1;
+            if(x_f>=0 && x_c<W && y_f>=0 && y_c<H){
+                const scalar_t nw_k = (x_c - x) * (y_c - y);
+                const scalar_t ne_k = (x - x_f) * (y_c - y);
+                const scalar_t sw_k = (x_c - x) * (y - y_f);
+                const scalar_t se_k = (x - x_f) * (y - y_f);
+                const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
+                scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
+                scalar_t* white_im1_p = white_im1+get_im_index(b, 0, y_f, x_f, C, H, W); // added warped white image
+                for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W, white_im1_p+=H*W){
+                    atomicAdd(im1_p,     nw_k*(*im0_p));
+                    atomicAdd(im1_p+1,   ne_k*(*im0_p));
+                    atomicAdd(im1_p+W,   sw_k*(*im0_p));
+                    atomicAdd(im1_p+W+1, se_k*(*im0_p));
+                    atomicAdd(white_im1_p,     nw_k); // added warped white image
+                    atomicAdd(white_im1_p+1,   ne_k); // added warped white image
+                    atomicAdd(white_im1_p+W,   sw_k); // added warped white image
+                    atomicAdd(white_im1_p+W+1, se_k); // added warped white image
                 }
             }
-        // }
+        } 
+        else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
+            const int x_nearest = static_cast<int>(::round(x));
+            const int y_nearest = static_cast<int>(::round(y));
+            if (x_nearest >= 0 && x_nearest < W && y_nearest >= 0 && y_nearest < H) {
+                const scalar_t* im0_p = im0 + get_im_index(b, 0, h, w, C, H, W);
+                scalar_t* im1_p = im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
+                scalar_t* white_im1_p = white_im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W); // added warped white image
+                for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W, white_im1_p += H*W) {
+                    *im1_p = *im0_p;
+                    *white_im1_p = 1; // set pixel value to 1 for the warped white image
+                }
+            }
+        }
+
     }
 }
 
@@ -185,7 +183,6 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
-  auto sort = at::zeros({im0.size(0), im0.size(2), im0.size(3)}, im0.options());  // Create the sort tensor with the same device and dtype as im0.
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
@@ -199,7 +196,6 @@ at::Tensor forward_warp_cuda_forward(
       flow.data<scalar_t>(),
       im1.data<scalar_t>(),
       white_im1.data<scalar_t>(), // added warped white image
-      sort.data<scalar_t>(),
       B, C, H, W,
       interpolation_mode);
   }));
