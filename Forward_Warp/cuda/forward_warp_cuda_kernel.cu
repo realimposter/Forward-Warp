@@ -186,6 +186,8 @@ __global__ void inpaint_nan_pixels_kernel(
     const int H,
     const int W) {
     const int total_step = B * C * H * W;
+    const int radius = 2;  // Add this line to define radius
+    
     CUDA_KERNEL_LOOP(index, total_step) {
         if (!isnan(im1[index])) continue;
 
@@ -196,8 +198,10 @@ __global__ void inpaint_nan_pixels_kernel(
 
         scalar_t sum = 0;
         int count = 0;
-        for (int i = max(0, h - 1); i <= min(H - 1, h + 1); ++i) {
-            for (int j = max(0, w - 1); j <= min(W - 1, w + 1); ++j) {
+
+        // Update loop bounds to consider a radius
+        for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
+            for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                 const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
                 if (!isnan(im1[neighbor_index])) {
                     sum += im1[neighbor_index];
@@ -209,6 +213,7 @@ __global__ void inpaint_nan_pixels_kernel(
         if (count > 0) im1[index] = sum / count;
     }
 }
+
 
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
