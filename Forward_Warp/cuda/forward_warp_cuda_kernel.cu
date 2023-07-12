@@ -185,60 +185,44 @@ __global__ void inpaint_nan_pixels_kernel(
     const int C,
     const int H,
     const int W) {
-    const int radius = 2;
-    const int max_x = W;
-    const int max_y = H;
-    const int max_z = C;
-    const int max_w = B;
+    const int total_step = B * C * H * W;
+    const int radius = 3;  // Add this line to define radius
 
-    const int x = threadIdx.x + blockIdx.x * blockDim.x;
-    const int y = threadIdx.y + blockIdx.y * blockDim.y;
-    const int z = threadIdx.z;
-    const int w = blockIdx.z;
+    for (int iteration = 0; iteration < 10; ++iteration) {
+        bool has_nan = false;  // Track if NaN pixels are found in the iteration
 
-    if (x < max_x && y < max_y && z < max_z && w < max_w) {
-        for (int iteration = 0; iteration < 10; ++iteration) {
-            bool has_nan = false;
+        CUDA_KERNEL_LOOP(index, total_step) {
+            if (!isnan(im1[index])) continue;
 
-            const int index = get_im_index(w, z, y, x, C, H, W);
+            const int b = index / (C * H * W);
+            const int c = (index - b * C * H * W) / (H * W);
+            const int h = (index - b * C * H * W - c * H * W) / W;
+            const int w = index % W;
 
-            if (isnan(im1[index])) {
-                scalar_t sum = 0;
-                int count = 0;
+            scalar_t sum = 0;
+            int count = 0;
 
-                // Update loop bounds to consider a radius
-                for (int i = max(0, y - radius); i <= min(max_y - 1, y + radius); ++i) {
-                    for (int j = max(0, x - radius); j <= min(max_x - 1, x + radius); ++j) {
-                        const int neighbor_index = get_im_index(w, z, i, j, C, H, W);
-                        if (!isnan(im1[neighbor_index])) {
-                            sum += im1[neighbor_index];
-                            ++count;
-                        }
+            // Update loop bounds to consider a radius
+            for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
+                for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
+                    const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
+                    if (!isnan(im1[neighbor_index])) {
+                        sum += im1[neighbor_index];
+                        ++count;
                     }
                 }
-
-                if (count > 0) im1[index] = sum / count;
-                else has_nan = true;
             }
 
-            __syncthreads();
-
-            // Each thread checks its own has_nan
-            bool global_has_nan = false;
-            for (int i = 0; i < blockDim.x * blockDim.y * blockDim.z; ++i) {
-                if (threadIdx.x + threadIdx.y + threadIdx.z == i && has_nan) {
-                    global_has_nan = true;
-                    break;
-                }
-                __syncthreads();
-            }
-
-            // Break out of the loop if no NaN pixels are found
-            if (!global_has_nan) break;
+            if (count > 0) im1[index] = sum / count;
+            else has_nan = true;  // Set has_nan to true if NaN pixels are found
         }
+
+        __syncthreads();  // Add this line to synchronize threads before starting the next iteration
+
+        // Break out of the loop if no NaN pixels are found
+        if (!has_nan) break;
     }
 }
-
 
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
