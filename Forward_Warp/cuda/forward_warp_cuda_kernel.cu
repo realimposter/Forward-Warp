@@ -185,61 +185,60 @@ __global__ void inpaint_nan_pixels_kernel(
     const int C,
     const int H,
     const int W) {
-    const int total_step = B * C * H * W;
-    const int radius = 2;  // Add this line to define radius
+    const int radius = 2;
+    const int max_x = W;
+    const int max_y = H;
+    const int max_z = C;
+    const int max_w = B;
 
-    // Define shared memory
-    __shared__ scalar_t shared_im[2 * radius + H][2 * radius + W];
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z;
+    const int w = blockIdx.z;
 
-    int tx = threadIdx.x, ty = threadIdx.y;
-    int bx = blockIdx.x, by = blockIdx.y;
+    if (x < max_x && y < max_y && z < max_z && w < max_w) {
+        for (int iteration = 0; iteration < 10; ++iteration) {
+            bool has_nan = false;
 
-    // Load global data to shared memory
-    for (int i = tx; i < 2 * radius + H; i += blockDim.x) {
-        for (int j = ty; j < 2 * radius + W; j += blockDim.y) {
-            if ((i >= radius && i < H + radius) && (j >= radius && j < W + radius)) {
-                const int global_index = get_im_index(bx, by, i - radius, j - radius, C, H, W);
-                shared_im[i][j] = isnan(im1[global_index]) ? 0 : im1[global_index];
-            } else {
-                shared_im[i][j] = 0;
-            }
-        }
-    }
+            const int index = get_im_index(w, z, y, x, C, H, W);
 
-    __syncthreads();
+            if (isnan(im1[index])) {
+                scalar_t sum = 0;
+                int count = 0;
 
-    for (int iteration = 0; iteration < 10; ++iteration) {
-        bool has_nan = false;  // Track if NaN pixels are found in the iteration
-
-        // Redefine loop in terms of threads in a block
-        if (tx < H && ty < W) {
-            const int index = get_im_index(bx, by, tx, ty, C, H, W);
-            if (!isnan(im1[index])) continue;
-
-            scalar_t sum = 0;
-            int count = 0;
-
-            // Update loop bounds to consider a radius
-            for (int i = max(0, tx - radius); i <= min(H - 1, tx + radius); ++i) {
-                for (int j = max(0, ty - radius); j <= min(W - 1, ty + radius); ++j) {
-                    const int neighbor_index = i * (2 * radius + W) + j;
-                    if (!isnan(shared_im[i][j])) {
-                        sum += shared_im[i][j];
-                        ++count;
+                // Update loop bounds to consider a radius
+                for (int i = max(0, y - radius); i <= min(max_y - 1, y + radius); ++i) {
+                    for (int j = max(0, x - radius); j <= min(max_x - 1, x + radius); ++j) {
+                        const int neighbor_index = get_im_index(w, z, i, j, C, H, W);
+                        if (!isnan(im1[neighbor_index])) {
+                            sum += im1[neighbor_index];
+                            ++count;
+                        }
                     }
                 }
+
+                if (count > 0) im1[index] = sum / count;
+                else has_nan = true;
             }
 
-            if (count > 0) im1[index] = sum / count;
-            else has_nan = true;  // Set has_nan to true if NaN pixels are found
+            __syncthreads();
+
+            // Each thread checks its own has_nan
+            bool global_has_nan = false;
+            for (int i = 0; i < blockDim.x * blockDim.y * blockDim.z; ++i) {
+                if (threadIdx.x + threadIdx.y + threadIdx.z == i && has_nan) {
+                    global_has_nan = true;
+                    break;
+                }
+                __syncthreads();
+            }
+
+            // Break out of the loop if no NaN pixels are found
+            if (!global_has_nan) break;
         }
-
-        __syncthreads();  // Add this line to synchronize threads before starting the next iteration
-
-        // Break out of the loop if no NaN pixels are found
-        if (!has_nan) break;
     }
 }
+
 
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
