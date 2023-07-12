@@ -188,26 +188,43 @@ __global__ void inpaint_nan_pixels_kernel(
     const int total_step = B * C * H * W;
     const int radius = 2;  // Add this line to define radius
 
+    // Define shared memory
+    __shared__ scalar_t shared_im[2 * radius + H][2 * radius + W];
+
+    int tx = threadIdx.x, ty = threadIdx.y;
+    int bx = blockIdx.x, by = blockIdx.y;
+
+    // Load global data to shared memory
+    for (int i = tx; i < 2 * radius + H; i += blockDim.x) {
+        for (int j = ty; j < 2 * radius + W; j += blockDim.y) {
+            if ((i >= radius && i < H + radius) && (j >= radius && j < W + radius)) {
+                const int global_index = get_im_index(bx, by, i - radius, j - radius, C, H, W);
+                shared_im[i][j] = isnan(im1[global_index]) ? 0 : im1[global_index];
+            } else {
+                shared_im[i][j] = 0;
+            }
+        }
+    }
+
+    __syncthreads();
+
     for (int iteration = 0; iteration < 10; ++iteration) {
         bool has_nan = false;  // Track if NaN pixels are found in the iteration
 
-        CUDA_KERNEL_LOOP(index, total_step) {
+        // Redefine loop in terms of threads in a block
+        if (tx < H && ty < W) {
+            const int index = get_im_index(bx, by, tx, ty, C, H, W);
             if (!isnan(im1[index])) continue;
-
-            const int b = index / (C * H * W);
-            const int c = (index - b * C * H * W) / (H * W);
-            const int h = (index - b * C * H * W - c * H * W) / W;
-            const int w = index % W;
 
             scalar_t sum = 0;
             int count = 0;
 
             // Update loop bounds to consider a radius
-            for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
-                for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
-                    const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
-                    if (!isnan(im1[neighbor_index])) {
-                        sum += im1[neighbor_index];
+            for (int i = max(0, tx - radius); i <= min(H - 1, tx + radius); ++i) {
+                for (int j = max(0, ty - radius); j <= min(W - 1, ty + radius); ++j) {
+                    const int neighbor_index = i * (2 * radius + W) + j;
+                    if (!isnan(shared_im[i][j])) {
+                        sum += shared_im[i][j];
                         ++count;
                     }
                 }
