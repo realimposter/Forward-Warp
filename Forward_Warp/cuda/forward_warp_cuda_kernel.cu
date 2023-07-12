@@ -186,52 +186,34 @@ __global__ void inpaint_nan_pixels_kernel(
     const int H,
     const int W) {
     const int total_step = B * C * H * W;
-    const int radius = 2;
-    const int blockId = blockIdx.y * gridDim.x + blockIdx.x;         
-    const int threadId = blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x;
-    __shared__ scalar_t shared_im1[blockDim.x * blockDim.y];
-    __shared__ bool has_nan[blockDim.x * blockDim.y];
+    const int radius = 2;  // Add this line to define radius
     
-    if (threadId < total_step) {
-        shared_im1[threadIdx.x] = im1[threadId];
-        has_nan[threadIdx.x] = isnan(shared_im1[threadIdx.x]);
-    }
-    __syncthreads();
+    CUDA_KERNEL_LOOP(index, total_step) {
+        if (!isnan(im1[index])) continue;
 
-    for (int iteration = 0; iteration < 10; ++iteration) {
-        if (threadId < total_step && has_nan[threadIdx.x]) {
-            const int b = threadId / (C * H * W);
-            const int c = (threadId - b * C * H * W) / (H * W);
-            const int h = (threadId - b * C * H * W - c * H * W) / W;
-            const int w = threadId % W;
+        const int b = index / (C * H * W);
+        const int c = (index - b * C * H * W) / (H * W);
+        const int h = (index - b * C * H * W - c * H * W) / W;
+        const int w = index % W;
 
-            scalar_t sum = 0;
-            int count = 0;
+        scalar_t sum = 0;
+        int count = 0;
 
-            for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
-                for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
-                    const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
-                    if (!isnan(im1[neighbor_index])) {
-                        sum += im1[neighbor_index];
-                        ++count;
-                    }
+        // Update loop bounds to consider a radius
+        for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
+            for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
+                const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
+                if (!isnan(im1[neighbor_index])) {
+                    sum += im1[neighbor_index];
+                    ++count;
                 }
             }
-
-            if (count > 0) {
-                shared_im1[threadIdx.x] = sum / count;
-                has_nan[threadIdx.x] = false;
-            }
         }
-        __syncthreads();
 
-        if (!any(has_nan)) break;
-    }
-
-    if (threadId < total_step) {
-        im1[threadId] = shared_im1[threadIdx.x];
+        if (count > 0) im1[index] = sum / count;
     }
 }
+
 
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
