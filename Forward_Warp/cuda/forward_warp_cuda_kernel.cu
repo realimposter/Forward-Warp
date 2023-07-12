@@ -177,6 +177,39 @@ __global__ void forward_warp_cuda_backward_kernel(
   }
 }
 
+
+template <typename scalar_t>
+__global__ void inpaint_nan_pixels_kernel(
+    scalar_t* im1,
+    const int B,
+    const int C,
+    const int H,
+    const int W) {
+    const int total_step = B * C * H * W;
+    CUDA_KERNEL_LOOP(index, total_step) {
+        if (!isnan(im1[index])) continue;
+
+        const int b = index / (C * H * W);
+        const int c = (index - b * C * H * W) / (H * W);
+        const int h = (index - b * C * H * W - c * H * W) / W;
+        const int w = index % W;
+
+        scalar_t sum = 0;
+        int count = 0;
+        for (int i = max(0, h - 1); i <= min(H - 1, h + 1); ++i) {
+            for (int j = max(0, w - 1); j <= min(W - 1, w + 1); ++j) {
+                const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
+                if (!isnan(im1[neighbor_index])) {
+                    sum += im1[neighbor_index];
+                    ++count;
+                }
+            }
+        }
+
+        if (count > 0) im1[index] = sum / count;
+    }
+}
+
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
     const at::Tensor flow,
@@ -198,9 +231,17 @@ at::Tensor forward_warp_cuda_forward(
       white_im1.data<scalar_t>(), // added warped white image
       B, C, H, W,
       interpolation_mode);
+
+    // Divide warped main image by warped white image
+    im1.div_(white_im1-1);
+
+    inpaint_nan_pixels_kernel<scalar_t>
+    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+      im1.data<scalar_t>(),
+      B, C, H, W);
+
+
   }));
-  // Divide warped main image by warped white image
-  im1.div_(white_im1-1);
   return im1;
 }
 
