@@ -7,7 +7,11 @@ setup(
         CUDAExtension('forward_warp_cuda', [
             'forward_warp_cuda.cpp',
             'forward_warp_cuda_kernel.cu',
-        ], extra_compile_args={'cxx': [], 'nvcc': ['-gencode', 'arch=compute_61,code=sm_61']}),
+        ], extra_compile_args={'cxx': [], 'nvcc': ['-arch=sm_80',
+                                                   '-gencode', 'arch=compute_80,code=sm_80',
+                                                   '-gencode', 'arch=compute_86,code=sm_86',
+                                                   '-gencode', 'arch=compute_89,code=sm_89',
+                                                   '-gencode', 'arch=compute_89,code=compute_89']}),
     ],
     cmdclass={
         'build_ext': BuildExtension
