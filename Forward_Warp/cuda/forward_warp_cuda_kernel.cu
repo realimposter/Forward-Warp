@@ -186,9 +186,9 @@ __global__ void inpaint_nan_pixels_kernel(
     const int H,
     const int W) {
     const int total_step = B * C * H * W;
-    const int radius = 3;  // Add this line to define radius
+    const int radius = 4;  // Add this line to define radius
 
-    for (int iteration = 0; iteration < 10; ++iteration) {
+    for (int iteration = 0; iteration < 24; ++iteration) {
         bool has_nan = false;  // Track if NaN pixels are found in the iteration
 
         CUDA_KERNEL_LOOP(index, total_step) {
