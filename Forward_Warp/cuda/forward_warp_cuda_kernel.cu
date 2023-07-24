@@ -238,10 +238,10 @@ at::Tensor forward_warp_cuda_forward(
     forward_warp_cuda_forward_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      im0.data<scalar_t>(),
-      flow.data<scalar_t>(),
-      im1.data<scalar_t>(),
-      white_im1.data<scalar_t>(), // added warped white image
+      im0.data_ptr<scalar_t>(),
+      flow.data_ptr<scalar_t>(),
+      im1.data_ptr<scalar_t>(),
+      white_im1.data_ptr<scalar_t>(), // added warped white image
       B, C, H, W,
       interpolation_mode);
 
@@ -253,9 +253,9 @@ at::Tensor forward_warp_cuda_forward(
     back_warp_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      im0.data<scalar_t>(),
-      flowback.data<scalar_t>(),
-      im2.data<scalar_t>(),
+      im0.data_ptr<scalar_t>(),
+      flowback.data_ptr<scalar_t>(),
+      im2.data_ptr<scalar_t>(),
       B, C, H, W);
 
     //////// FILL im2 NaNs with im1 values ////////
@@ -264,7 +264,7 @@ at::Tensor forward_warp_cuda_forward(
     /////// INPAINTING //////////
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      im1.data<scalar_t>(),
+      im1.data_ptr<scalar_t>(),
       B, C, H, W,
       infill_iterations);
 
