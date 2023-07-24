@@ -16,7 +16,6 @@ class forward_warp_function(Function):
         assert(im0.shape[-2:] == flow.shape[1:3])
         assert(flow.shape[3] == 2)
         ctx.interpolation_mode = interpolation_mode
-        ctx.save_for_backward(im0, flow)
         im1 = forward_warp_cuda.forward(im0, flow, flowback, interpolation_mode)
         return im1
 
