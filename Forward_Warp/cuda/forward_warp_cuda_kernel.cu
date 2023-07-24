@@ -108,73 +108,65 @@ __global__ void forward_warp_cuda_forward_kernel(
     }
 }
 
+
 template <typename scalar_t>
-__global__ void forward_warp_cuda_backward_kernel(
+__global__ void back_warp_kernel(
     const int total_step,
-    const scalar_t* grad_output,
     const scalar_t* im0,
-    const scalar_t* flow,
-    scalar_t* im0_grad,
-    scalar_t* flow_grad,
+    scalar_t* flow,
+    scalar_t* im1,
     const int B,
     const int C,
     const int H,
-    const int W,
-    const GridSamplerInterpolation interpolation_mode) {
-  CUDA_KERNEL_LOOP(index, total_step) {
-    const int b = index / (H * W);
-    const int h = (index-b*H*W) / W;
-    const int w = index % W;
-    const scalar_t x = (scalar_t)w + flow[index*2+0];
-    const scalar_t y = (scalar_t)h + flow[index*2+1];
-    if (interpolation_mode == GridSamplerInterpolation::Bilinear) {
-      const int x_f = static_cast<int>(::floor(x));
-      const int y_f = static_cast<int>(::floor(y));
-      const int x_c = x_f + 1;
-      const int y_c = y_f + 1;
-      if(x_f>=0 && x_c<W && y_f>=0 && y_c<H){
-        const scalar_t nw_k = (x_c - x) * (y_c - y);
-        const scalar_t sw_k = (x_c - x) * (y - y_f);
-        const scalar_t ne_k = (x - x_f) * (y_c - y);
-        const scalar_t se_k = (x - x_f) * (y - y_f);
-        scalar_t flow_grad_x = 0;
-        scalar_t flow_grad_y = 0;
-        scalar_t* im0_grad_p = im0_grad+get_im_index(b, 0, h, w, C, H, W);
-        for (int c = 0; c < C; ++c, im0_grad_p+=H*W){
-          const scalar_t nw_grad = grad_output[get_im_index(b, c, y_f, x_f, C, H, W)];
-          const scalar_t ne_grad = grad_output[get_im_index(b, c, y_f, x_c, C, H, W)];
-          const scalar_t sw_grad = grad_output[get_im_index(b, c, y_c, x_f, C, H, W)];
-          const scalar_t se_grad = grad_output[get_im_index(b, c, y_c, x_c, C, H, W)];
-          const scalar_t p = im0[get_im_index(b, c, h, w, C, H, W)];
-          atomicAdd(im0_grad_p, nw_k*nw_grad);
-          atomicAdd(im0_grad_p, ne_k*ne_grad);
-          atomicAdd(im0_grad_p, sw_k*sw_grad);
-          atomicAdd(im0_grad_p, se_k*se_grad);
-          flow_grad_x -= (y_c-y)*p*nw_grad;
-          flow_grad_y -= (x_c-x)*p*nw_grad;
-          flow_grad_x += (y_c-y)*p*ne_grad;
-          flow_grad_y -= (x-x_f)*p*ne_grad;
-          flow_grad_x -= (y-y_f)*p*sw_grad;
-          flow_grad_y += (x_c-x)*p*sw_grad;
-          flow_grad_x += (y-y_f)*p*se_grad;
-          flow_grad_y += (x-x_f)*p*se_grad;
+    const int W) {
+    CUDA_KERNEL_LOOP(index, total_step) {
+        const int b = index / (H * W);
+        const int h = (index-b*H*W) / W;
+        const int w = index % W;
+
+        const scalar_t x = (scalar_t)w + flow[index*2+0];
+        const scalar_t y = (scalar_t)h + flow[index*2+1];
+
+        //get im1 value from im0 using flow, leaving holes as NaN
+        if (x < 0 || y < 0 || x >= W || y >= H) {
+            // Out of bound, leave as NaN
+            for (int c = 0; c < C; ++c) {
+                im1[b * (H * W * C) + c * (H * W) + h * W + w] = NAN;
+            }
+        } else {
+            // Bilinear interpolation
+            const int x1 = static_cast<int>(::floor(x));
+            const int y1 = static_cast<int>(::floor(y));
+            const int x2 = x1 + 1;
+            const int y2 = y1 + 1;
+
+            const scalar_t dist_x = x - x1;
+            const scalar_t dist_y = y - y1;
+
+            for (int c = 0; c < C; ++c) {
+                // Compute weights
+                scalar_t w1 = (1 - dist_x) * (1 - dist_y);
+                scalar_t w2 = dist_x * (1 - dist_y);
+                scalar_t w3 = (1 - dist_x) * dist_y;
+                scalar_t w4 = dist_x * dist_y;
+
+                // Fetch pixel values
+                scalar_t p1 = (x1 < W && y1 < H) ? im0[b * (H * W * C) + c * (H * W) + y1 * W + x1] : NAN;
+                scalar_t p2 = (x2 < W && y1 < H) ? im0[b * (H * W * C) + c * (H * W) + y1 * W + x2] : NAN;
+                scalar_t p3 = (x1 < W && y2 < H) ? im0[b * (H * W * C) + c * (H * W) + y2 * W + x1] : NAN;
+                scalar_t p4 = (x2 < W && y2 < H) ? im0[b * (H * W * C) + c * (H * W) + y2 * W + x2] : NAN;
+
+                // Check for NaN values in the fetched pixels
+                if (isnan(p1) || isnan(p2) || isnan(p3) || isnan(p4)) {
+                    im1[b * (H * W * C) + c * (H * W) + h * W + w] = NAN;
+                } else {
+                    // Compute interpolated pixel value
+                    scalar_t px_val = p1 * w1 + p2 * w2 + p3 * w3 + p4 * w4;
+                    im1[b * (H * W * C) + c * (H * W) + h * W + w] = px_val;
+                }
+            }
         }
-        flow_grad[index*2+0] = flow_grad_x;
-        flow_grad[index*2+1] = flow_grad_y;
-      }
-    } 
-    else if (interpolation_mode == GridSamplerInterpolation::Nearest) {
-      const int x_nearest = static_cast<int>(::round(x));
-      const int y_nearest = static_cast<int>(::round(y));
-      if(x_nearest>=0 && x_nearest<W && y_nearest>=0 && y_nearest<H){
-        scalar_t* im0_grad_p = im0_grad+get_im_index(b, 0, h, w, C, H, W);
-        const scalar_t* im1_grad_p = grad_output+get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
-        for (int c = 0; c < C; ++c, im0_grad_p += H*W, im1_grad_p += H*W) {
-            *im0_grad_p = *im1_grad_p;
-        }
-      }
     }
-  }
 }
 
 
@@ -227,8 +219,10 @@ __global__ void inpaint_nan_pixels_kernel(
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
     const at::Tensor flow,
+    const at::Tensor flowback,
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
+  auto im2 = at::zeros_like(im0);
   auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
   const int B = im0.size(0);
   const int C = im0.size(1);
@@ -236,6 +230,8 @@ at::Tensor forward_warp_cuda_forward(
   const int W = im0.size(3);
   const int total_step = B * H * W;
   AT_DISPATCH_FLOATING_TYPES(im0.scalar_type(), "forward_warp_forward_cuda", ([&] {
+
+    /////////// FORWARD WARP ////////////
     forward_warp_cuda_forward_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
@@ -249,41 +245,25 @@ at::Tensor forward_warp_cuda_forward(
     // Divide warped main image by warped white image
     im1.div_(white_im1-1);
 
-    inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      im1.data<scalar_t>(),
-      B, C, H, W);
-
-
-  }));
-  return im1;
-}
-
-std::vector<at::Tensor> forward_warp_cuda_backward(
-    const at::Tensor grad_output,
-    const at::Tensor im0, 
-    const at::Tensor flow,
-    const GridSamplerInterpolation interpolation_mode) {
-  auto im0_grad = at::zeros_like(grad_output);
-  auto flow_grad = at::empty_like(flow);
-  const int B = im0.size(0);
-  const int C = im0.size(1);
-  const int H = im0.size(2);
-  const int W = im0.size(3);
-  const int total_step = B * H * W;
-
-  AT_DISPATCH_FLOATING_TYPES(grad_output.type(), "forward_warp_backward_cuda", ([&] {
-    forward_warp_cuda_backward_kernel<scalar_t>
+    /////// WARPP BACKWARDS //////////
+    back_warp_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      grad_output.data<scalar_t>(),
       im0.data_ptr<scalar_t>(),
-      flow.data<scalar_t>(),
-      im0_grad.data<scalar_t>(),
-      flow_grad.data<scalar_t>(),
-      B, C, H, W,
-      interpolation_mode);
-  }));
+      flowback.data_ptr<scalar_t>(),
+      im2.data_ptr<scalar_t>(),
+      B, C, H, W);
 
-  return {im0_grad, flow_grad};
+    //////// mask im2 by adding im1 NaNs ////////
+    auto nan_mask = at::isnan(im1);
+    im2 = at::where(nan_mask, im1, im2);
+
+    /////// INPAINTING //////////
+    inpaint_nan_pixels_kernel<scalar_t>
+    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+      im2.data_ptr<scalar_t>(),
+      B, C, H, W);
+
+  }));
+  return im2;
 }
