@@ -232,6 +232,7 @@ at::Tensor forward_warp_cuda_forward(
   const int H = im0.size(2);
   const int W = im0.size(3);
   const int total_step = B * H * W;
+
   AT_DISPATCH_FLOATING_TYPES(im0.scalar_type(), "forward_warp_forward_cuda", ([&] {
     ///////// WARP FORWARDS //////////
     forward_warp_cuda_forward_kernel<scalar_t>
@@ -239,7 +240,6 @@ at::Tensor forward_warp_cuda_forward(
       total_step,
       im0.data<scalar_t>(),
       flow.data<scalar_t>(),
-      flowback.data<scalar_t>(),
       im1.data<scalar_t>(),
       white_im1.data<scalar_t>(), // added warped white image
       B, C, H, W,
@@ -254,12 +254,9 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       im0.data<scalar_t>(),
-      flow.data<scalar_t>(),
       flowback.data<scalar_t>(),
       im2.data<scalar_t>(),
-      white_im1.data<scalar_t>(), // added warped white image
-      B, C, H, W,
-      interpolation_mode);
+      B, C, H, W);
 
     //////// FILL im2 NaNs with im1 values ////////
     im2.masked_fill_(im2.isnan(), im1);
