@@ -171,14 +171,8 @@ __global__ void back_warp_kernel(
 }
 
 
-template <typename scalar_t>
-__global__ void inpaint_nan_pixels_kernel(
-    scalar_t* im1,
-    const int B,
-    const int C,
-    const int H,
-    const int W,
-    const int infill_iterations) {
+template <typename scalar_t> __global__ void inpaint_nan_pixels_kernel(scalar_t* im1,const int B,const int C,const int H,const int W,const int infill_iterations)
+{
     const int total_step = B * C * H * W;
     const int radius = 4;  // Add this line to define radius
 
