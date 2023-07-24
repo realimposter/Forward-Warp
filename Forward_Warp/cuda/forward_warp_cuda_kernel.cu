@@ -261,8 +261,7 @@ at::Tensor forward_warp_cuda_forward(
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       im2.data_ptr<scalar_t>(),
-      B, C, H, W,
-      infill_iterations);
+      B, C, H, W);
 
   }));
   return im2;
