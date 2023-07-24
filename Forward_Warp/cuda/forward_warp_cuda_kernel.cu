@@ -109,7 +109,6 @@ __global__ void forward_warp_cuda_forward_kernel(
 }
 
 
-
 // template <typename scalar_t>
 // __global__ void back_warp_kernel(
 //     const int total_step,
