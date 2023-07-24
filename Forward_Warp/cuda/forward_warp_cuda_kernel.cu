@@ -108,6 +108,69 @@ __global__ void forward_warp_cuda_forward_kernel(
     }
 }
 
+
+
+template <typename scalar_t>
+__global__ void back_warp_kernel(
+    const int total_step,
+    const scalar_t* im0,
+    scalar_t* flow,
+    scalar_t* im1,
+    const int B,
+    const int C,
+    const int H,
+    const int W) {
+    CUDA_KERNEL_LOOP(index, total_step) {
+        const int b = index / (H * W);
+        const int h = (index-b*H*W) / W;
+        const int w = index % W;
+
+        const scalar_t x = (scalar_t)w + flow[index*2+0];
+        const scalar_t y = (scalar_t)h + flow[index*2+1];
+
+        //get im1 value from im0 using flow, leaving holes as NaN
+        if (x < 0 || y < 0 || x >= W || y >= H) {
+            // Out of bound, leave as NaN
+            for (int c = 0; c < C; ++c) {
+                im1[b * (H * W * C) + c * (H * W) + h * W + w] = NAN;
+            }
+        } else {
+            // Bilinear interpolation
+            const int x1 = static_cast<int>(::floor(x));
+            const int y1 = static_cast<int>(::floor(y));
+            const int x2 = x1 + 1;
+            const int y2 = y1 + 1;
+
+            const scalar_t dist_x = x - x1;
+            const scalar_t dist_y = y - y1;
+
+            for (int c = 0; c < C; ++c) {
+                // Compute weights
+                scalar_t w1 = (1 - dist_x) * (1 - dist_y);
+                scalar_t w2 = dist_x * (1 - dist_y);
+                scalar_t w3 = (1 - dist_x) * dist_y;
+                scalar_t w4 = dist_x * dist_y;
+
+                // Fetch pixel values
+                scalar_t p1 = (x1 < W && y1 < H) ? im0[b * (H * W * C) + c * (H * W) + y1 * W + x1] : NAN;
+                scalar_t p2 = (x2 < W && y1 < H) ? im0[b * (H * W * C) + c * (H * W) + y1 * W + x2] : NAN;
+                scalar_t p3 = (x1 < W && y2 < H) ? im0[b * (H * W * C) + c * (H * W) + y2 * W + x1] : NAN;
+                scalar_t p4 = (x2 < W && y2 < H) ? im0[b * (H * W * C) + c * (H * W) + y2 * W + x2] : NAN;
+
+                // Check for NaN values in the fetched pixels
+                if (isnan(p1) || isnan(p2) || isnan(p3) || isnan(p4)) {
+                    im1[b * (H * W * C) + c * (H * W) + h * W + w] = NAN;
+                } else {
+                    // Compute interpolated pixel value
+                    scalar_t px_val = p1 * w1 + p2 * w2 + p3 * w3 + p4 * w4;
+                    im1[b * (H * W * C) + c * (H * W) + h * W + w] = px_val;
+                }
+            }
+        }
+    }
+}
+
+
 template <typename scalar_t>
 __global__ void forward_warp_cuda_backward_kernel(
     const int total_step,
@@ -184,11 +247,12 @@ __global__ void inpaint_nan_pixels_kernel(
     const int B,
     const int C,
     const int H,
-    const int W) {
+    const int W,
+    const int infill_iterations) {
     const int total_step = B * C * H * W;
     const int radius = 4;  // Add this line to define radius
 
-    for (int iteration = 0; iteration < 24; ++iteration) {
+    for (int iteration = 0; iteration < infill_iterations; ++iteration) {
         bool has_nan = false;  // Track if NaN pixels are found in the iteration
 
         CUDA_KERNEL_LOOP(index, total_step) {
@@ -227,20 +291,25 @@ __global__ void inpaint_nan_pixels_kernel(
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
     const at::Tensor flow,
-    const GridSamplerInterpolation interpolation_mode) {
+    const at::Tensor flowback,
+    const GridSamplerInterpolation interpolation_mode,
+    const int infill_iterations) {
   auto im1 = at::zeros_like(im0);
   auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
+  auto im2 = at::zeros_like(im0);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
   const int W = im0.size(3);
   const int total_step = B * H * W;
   AT_DISPATCH_FLOATING_TYPES(im0.scalar_type(), "forward_warp_forward_cuda", ([&] {
+    ///////// WARP FORWARDS //////////
     forward_warp_cuda_forward_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       im0.data<scalar_t>(),
       flow.data<scalar_t>(),
+      flowback.data<scalar_t>(),
       im1.data<scalar_t>(),
       white_im1.data<scalar_t>(), // added warped white image
       B, C, H, W,
@@ -249,11 +318,28 @@ at::Tensor forward_warp_cuda_forward(
     // Divide warped main image by warped white image
     im1.div_(white_im1-1);
 
+
+    /////// WARPP BACKWARDS //////////
+    back_warp_kernel<scalar_t>
+    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+      total_step,
+      im0.data<scalar_t>(),
+      flow.data<scalar_t>(),
+      flowback.data<scalar_t>(),
+      im2.data<scalar_t>(),
+      white_im1.data<scalar_t>(), // added warped white image
+      B, C, H, W,
+      interpolation_mode);
+
+    //////// FILL im2 NaNs with im1 values ////////
+    im2.masked_fill_(im2.isnan(), im1);
+
+    /////// INPAINTING //////////
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       im1.data<scalar_t>(),
-      B, C, H, W);
-
+      B, C, H, W,
+      infill_iterations);
 
   }));
   return im1;
