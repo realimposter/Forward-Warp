@@ -9,7 +9,7 @@ from .python import Forward_Warp_Python
 class forward_warp_function(Function):
 
     @staticmethod
-    def forward(ctx, im0, flow, interpolation_mode):
+    def forward(ctx, im0, flow, flowback, interpolation_mode):
         '''
         im0: the first image with shape [B, C, H, W]
         flow: the optical flow with shape [B, H, W, 2] (different to grid_sample, it's range is from [-W, -H] to [W, H])
@@ -23,23 +23,8 @@ class forward_warp_function(Function):
 
         ctx.interpolation_mode = interpolation_mode
         ctx.save_for_backward(im0, flow)
-        if im0.is_cuda:
-            im1 = forward_warp_cuda.forward(im0, flow, interpolation_mode)
-        else:
-            im1 = Forward_Warp_Python.forward(im0, flow, interpolation_mode)
-
+        im1 = forward_warp_cuda.forward(im0, flow, flowback, interpolation_mode)
         return im1
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        im0, flow = ctx.saved_variables
-        if grad_output.is_cuda:
-            im0_grad, flow_grad = forward_warp_cuda.backward(
-                grad_output, im0, flow, ctx.interpolation_mode)
-        else:
-            im0_grad, flow_grad = Forward_Warp_Python.backward(
-                grad_output, im0, flow, ctx.interpolation_mode)
-        return im0_grad, flow_grad, None
 
 
 class forward_warp(Module):
@@ -54,7 +39,5 @@ class forward_warp(Module):
             self.interpolation_mode = 0
         else:
             self.interpolation_mode = 1
-
-    def forward(self, im0, flow):
-
-        return forward_warp_function.apply(im0, flow, self.interpolation_mode)
+    def forward(self, im0, flow, flowback):
+        return forward_warp_function.apply(im0, flow, flowback, self.interpolation_mode)
