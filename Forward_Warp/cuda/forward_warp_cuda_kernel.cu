@@ -255,8 +255,9 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     //////// FILL im2 NaNs with im1 values ////////
-    auto mask = im2.isnan();
-    im2 = torch::where(mask, im1, im2);
+    auto nan_mask = at::isnan(im2);
+    // fill NaNs in im2 with values from im1
+    im2.masked_scatter_(nan_mask, im1.masked_select(nan_mask));
 
     /////// INPAINTING //////////
     inpaint_nan_pixels_kernel<scalar_t>
