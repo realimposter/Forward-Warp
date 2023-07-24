@@ -22,5 +22,5 @@ class forward_warp(Module):
         assert(interpolation_mode in ("Bilinear", "Nearest"))
         if(interpolation_mode == "Bilinear"):self.interpolation_mode = 0
         else:self.interpolation_mode = 1
-    def forward(self, im0, flow, infill_iterations, flowback):
+    def forward(self, im0, flow, flowback, infill_iterations):
         return forward_warp_function.apply(im0, flow, flowback, infill_iterations, self.interpolation_mode)
