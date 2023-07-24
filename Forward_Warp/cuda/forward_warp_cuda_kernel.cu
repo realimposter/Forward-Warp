@@ -245,7 +245,6 @@ at::Tensor forward_warp_cuda_forward(
     // Divide warped main image by warped white image
     im1.div_(white_im1-1);
 
-
     /////// WARPP BACKWARDS //////////
     back_warp_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
@@ -255,13 +254,16 @@ at::Tensor forward_warp_cuda_forward(
       im2.data_ptr<scalar_t>(),
       B, C, H, W);
 
+    //////// FILL im2 NaNs with im1 values ////////
+    im2.masked_fill_(im2.isnan(), im1);
 
+    /////// INPAINTING //////////
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      im1.data<scalar_t>(),
-      B, C, H, W);
-
+      im2.data_ptr<scalar_t>(),
+      B, C, H, W,
+      infill_iterations);
 
   }));
-  return im1;
+  return im2;
 }
