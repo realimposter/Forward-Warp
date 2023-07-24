@@ -55,6 +55,6 @@ class forward_warp(Module):
         else:
             self.interpolation_mode = 1
 
-    def forward(self, im0, flow):
+    def forward(self, im0, flow, flowback):
 
         return forward_warp_function.apply(im0, flow, flowback, self.interpolation_mode)
