@@ -26,6 +26,7 @@ __global__ void forward_warp_cuda_forward_kernel(
     const int total_step,
     const scalar_t* im0,
     scalar_t* flow,
+    scalar_t* flowback,
     scalar_t* im1,
     scalar_t* white_im1,
     const int B,
@@ -227,6 +228,7 @@ __global__ void inpaint_nan_pixels_kernel(
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
     const at::Tensor flow,
+    const at::Tensor flowback,
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
