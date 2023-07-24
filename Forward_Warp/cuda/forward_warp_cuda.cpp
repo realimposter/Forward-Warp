@@ -7,6 +7,7 @@ using at::native::detail::GridSamplerInterpolation;
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0, 
     const at::Tensor flow,
+    const at::Tensor flowback,
     const GridSamplerInterpolation interpolation_mode);
 std::vector<at::Tensor> forward_warp_cuda_backward(
     const at::Tensor grad_output,
@@ -22,10 +23,11 @@ std::vector<at::Tensor> forward_warp_cuda_backward(
 at::Tensor forward_warp_forward(
     const at::Tensor im0, 
     const at::Tensor flow,
+    const at::Tensor flowback,
     const int interpolation_mode){
   // CHECK_INPUT(im0);
   // CHECK_INPUT(flow);
-  return forward_warp_cuda_forward(im0, flow, (GridSamplerInterpolation)interpolation_mode);
+  return forward_warp_cuda_forward(im0, flow, flowback, (GridSamplerInterpolation)interpolation_mode);
 }
 
 std::vector<at::Tensor> forward_warp_backward(
