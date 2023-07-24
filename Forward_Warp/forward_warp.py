@@ -31,17 +31,6 @@ class forward_warp_function(Function):
 
         return im1
 
-    @staticmethod
-    def backward(ctx, grad_output):
-        im0, flow = ctx.saved_variables
-        if grad_output.is_cuda:
-            im0_grad, flow_grad = forward_warp_cuda.backward(
-                grad_output, im0, flow, ctx.interpolation_mode)
-        else:
-            im0_grad, flow_grad = Forward_Warp_Python.backward(
-                grad_output, im0, flow, ctx.interpolation_mode)
-        return im0_grad, flow_grad, None
-
 
 class forward_warp(Module):
 
