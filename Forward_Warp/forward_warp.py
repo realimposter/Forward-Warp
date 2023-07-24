@@ -27,7 +27,7 @@ class forward_warp_function(Function):
         if im0.is_cuda:
             im1 = forward_warp_cuda.forward(im0, flow, flowback, infil_iterations, interpolation_mode)
         else:
-            im1 = Forward_Warp_Python.forward(im0, flow, interpolation_mode)
+            im1 = Forward_Warp_Python.forward(im0, flow, flowback, infil_iterations, interpolation_mode)
 
         return im1
 
