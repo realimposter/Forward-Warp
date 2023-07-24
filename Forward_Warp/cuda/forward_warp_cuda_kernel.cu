@@ -254,14 +254,10 @@ at::Tensor forward_warp_cuda_forward(
       im2.data_ptr<scalar_t>(),
       B, C, H, W);
 
-    //////// FILL im2 NaNs with im1 values ////////
-    auto nan_mask = at::isnan(im2);
 
-    //where white_im1 is 1 set im2 to NaN
-    im2.masked_fill_(white_im1, NAN); 
-
-    // fill NaNs in im2 with values from im1
-    // im2.masked_scatter_(nan_mask, im1.masked_select(nan_mask));
+    // If pixel in im1 is NaN then make the pixel in Im2 also NaN
+    auto mask_nan = at::isnan(im1);
+    im2.masked_fill_(mask_nan, NAN);
 
     /////// INPAINTING //////////
     inpaint_nan_pixels_kernel<scalar_t>
