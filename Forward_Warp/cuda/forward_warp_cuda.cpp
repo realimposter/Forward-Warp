@@ -8,6 +8,7 @@ at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0, 
     const at::Tensor flow,
     const at::Tensor flowback,
+    const int infill_iterations,
     const GridSamplerInterpolation interpolation_mode);
 
 // Because of the incompatible of Pytorch 1.0 && Pytorch 0.4, we have to annotation this.
@@ -19,10 +20,11 @@ at::Tensor forward_warp_forward(
     const at::Tensor im0, 
     const at::Tensor flow,
     const at::Tensor flowback,
+    const int infill_iterations
     const int interpolation_mode){
   // CHECK_INPUT(im0);
   // CHECK_INPUT(flow);
-  return forward_warp_cuda_forward(im0, flow, flowback, (GridSamplerInterpolation)interpolation_mode);
+  return forward_warp_cuda_forward(im0, flow, flowback, infill_iterations, (GridSamplerInterpolation)interpolation_mode);
 }
 
 PYBIND11_MODULE(
