@@ -214,12 +214,13 @@ __global__ void forward_warp_cuda_forward_kernel(
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
     const at::Tensor flow,
-    const at::Tensor flowback,
+    //const at::Tensor flowback,
     const GridSamplerInterpolation interpolation_mode,
-    const int infill_iterations) {
+    //const int infill_iterations
+) {
   auto im1 = at::zeros_like(im0);
   auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
-  auto im2 = at::zeros_like(im0);
+  //auto im2 = at::zeros_like(im0);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
