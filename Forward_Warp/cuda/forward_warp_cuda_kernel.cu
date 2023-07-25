@@ -33,7 +33,7 @@ __global__ void forward_warp_cuda_forward_kernel(
     const int H,
     const int W,
     const GridSamplerInterpolation interpolation_mode) {
-    int dilate_radius = 2; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    int dilate_radius = 10; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
@@ -119,38 +119,10 @@ __global__ void back_warp_kernel(
     const int C,
     const int H,
     const int W) {
-    int dilate_radius = 2; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
         const int w = index % W;
-
-
-        // Initialize largest_flow_amplitude and its location
-        scalar_t largest_flow_amplitude = -1;
-        int largest_loc = -1;
-
-        // Iterate over the neighborhood defined by dilate_radius
-        for (int i = max(0, h-dilate_radius); i <= min(H-1, h+dilate_radius); ++i) {
-            for (int j = max(0, w-dilate_radius); j <= min(W-1, w+dilate_radius); ++j) {
-                const int neighbor_index = b*H*W + i*W + j;
-                const scalar_t neighbor_flow_amplitude = hypotf(flow[neighbor_index*2+0], flow[neighbor_index*2+1]);
-                if (neighbor_flow_amplitude > largest_flow_amplitude) {
-                    largest_flow_amplitude = neighbor_flow_amplitude;
-                    largest_loc = neighbor_index;
-                }
-            }
-        }
-
-        // Check if the largest_flow_amplitude is more than 4 greater than current pixel amplitude
-        const scalar_t current_flow_amplitude = hypotf(flow[index*2+0], flow[index*2+1]);
-        if ((largest_flow_amplitude - current_flow_amplitude) > 3) {
-            // Update flow
-            flow[index*2+0] = flow[largest_loc*2+0];
-            flow[index*2+1] = flow[largest_loc*2+1];
-        }
-
-
 
         const scalar_t x = (scalar_t)w + flow[index*2+0];
         const scalar_t y = (scalar_t)h + flow[index*2+1];
