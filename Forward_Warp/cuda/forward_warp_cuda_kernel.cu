@@ -215,9 +215,13 @@ __global__ void inpaint_nan_pixels_kernel(
                     // foreach neighborig pixel
                     const int neighbor_index = get_pixel_index(b, neighbor_x, neighbor_y, H, W);
 
-                    im1[red] = im1[(neighbor_index*C)+0];
-                    im1[green] = im1[(neighbor_index*C)+1];
-                    im1[blue] = im1[(neighbor_index*C)+2];
+                    // im1[red] = im1[(neighbor_index*C)+0];
+                    // im1[green] = im1[(neighbor_index*C)+1];
+                    // im1[blue] = im1[(neighbor_index*C)+2];
+
+                    im1[red] = 255;
+                    im1[green] = 0;
+                    im1[blue] = 255;
                     // move on to next kernel loop NaN pixel
                     goto next_pixel;
 
@@ -298,7 +302,7 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_pixels), CUDA_NUM_THREADS>>>(
       im2.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
-      B, 3, H, W);
+      B, C, H, W);
 
   }));
   return im2;
