@@ -195,6 +195,7 @@ __global__ void inpaint_nan_pixels_kernel(
     for (int iteration = 0; iteration < 24; ++iteration) {
         nan_count = 0;
         CUDA_KERNEL_LOOP(index, total_step) {
+            index+=1;
             int red = (index * C) + 0;
             int green = (index * C) + 1;
             int blue = (index * C) + 2;
