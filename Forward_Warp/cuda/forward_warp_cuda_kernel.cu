@@ -207,7 +207,7 @@ __global__ void inpaint_nan_pixels_kernel(
                         const scalar_t flow_y2 = flowback[neighbor_index*2+1];
                         scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
 
-                        if (flowback_diff < 1){
+                        if (flowback_diff < 0.0001){
                           sum += im1[neighbor_index];
                           count=count+1;
                           break;
