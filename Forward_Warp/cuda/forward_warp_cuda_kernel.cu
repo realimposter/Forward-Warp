@@ -205,10 +205,10 @@ __global__ void inpaint_nan_pixels_kernel(
                         scalar_t flowback_diff = abs(flowback[index] - flowback[neighbor_index]);
 
                         // Check if the flowback difference is below the threshold
-                        if (flowback_diff <= threshold) {
+                        // if (flowback_diff <= threshold) {
                             sum += im1[neighbor_index];
                             ++count;
-                        }
+                        // }
                     }
                 }
             }
