@@ -217,7 +217,7 @@ __global__ void inpaint_nan_pixels_kernel(
                 }
             }
 
-            if (count > 0) im1[index] = sum / count;
+            if (count > 0) im1[index] = (sum / count)-1;
             else has_nan = true;  // Set has_nan to true if NaN pixels are found
         }
 
