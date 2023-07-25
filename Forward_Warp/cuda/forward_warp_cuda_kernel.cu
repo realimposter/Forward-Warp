@@ -258,11 +258,11 @@ at::Tensor forward_warp_cuda_forward(
     auto nan_mask = at::isnan(im1);
     im2 = at::where(nan_mask, im1, im2);
 
-    /////// INPAINTING //////////
-    inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      im2.data_ptr<scalar_t>(),
-      B, C, H, W);
+    // /////// INPAINTING //////////
+    // inpaint_nan_pixels_kernel<scalar_t>
+    // <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+    //   im2.data_ptr<scalar_t>(),
+    //   B, C, H, W);
 
   }));
   return im2;
