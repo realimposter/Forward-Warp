@@ -33,7 +33,7 @@ __global__ void forward_warp_cuda_forward_kernel(
     const int H,
     const int W,
     const GridSamplerInterpolation interpolation_mode) {
-    int dilate_radius = 10; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    int dilate_radius = 24; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
@@ -180,7 +180,7 @@ __global__ void inpaint_nan_pixels_kernel(
     const int total_step = B * C * H * W;
     const int radius = 4;  // Add this line to define radius
 
-    for (int iteration = 0; iteration < 24; ++iteration) {
+    for (int iteration = 0; iteration < 64; ++iteration) {
         bool has_nan = false;  // Track if NaN pixels are found in the iteration
 
         CUDA_KERNEL_LOOP(index, total_step) {
