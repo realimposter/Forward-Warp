@@ -219,9 +219,9 @@ __global__ void inpaint_nan_pixels_kernel(
                     // im1[green] = im1[(neighbor_index*C)+1];
                     // im1[blue] = im1[(neighbor_index*C)+2];
 
-                    im1[red] = 255;
+                    im1[red] = 1;
                     im1[green] = 0;
-                    im1[blue] = 255;
+                    im1[blue] = 1;
                     // move on to next kernel loop NaN pixel
                     goto next_pixel;
 
