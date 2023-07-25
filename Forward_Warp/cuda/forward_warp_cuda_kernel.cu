@@ -203,18 +203,17 @@ __global__ void inpaint_nan_pixels_kernel(
             if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) continue;
             nan_count += 1;
             const int b = index / (H * W);
-            const int h = (index - b * H * W) / W;
-            const int w = index % W;
+            const int pixel_x = (index - b * H * W) / W;
+            const int pixel_y = index % W;
 
             const scalar_t flow_x = flowback[index*2+0];
             const scalar_t flow_y = flowback[index*2+1];
 
             // foreach pixel in a radious of "radius" arounnd index
-            for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
-                for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
+            for (int neighbor_x = max(0, pixel_x - radius); neighbor_x <= min(H - 1, pixel_x + radius); ++neighbor_x) {
+                for (int neighbor_y = max(0, pixel_y - radius); neighbor_y <= min(W - 1, pixel_y + radius); ++neighbor_y) {
                     // foreach neighborig pixel
-                    const int neighbor_index = get_pixel_index(b, i, j, H, W);
-
+                    const int neighbor_index = get_pixel_index(b, neighbor_x, neighbor_y, H, W);
 
                     im1[red] = im1[(neighbor_index*C)+0];
                     im1[green] = im1[(neighbor_index*C)+1];
@@ -299,7 +298,7 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_pixels), CUDA_NUM_THREADS>>>(
       im2.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
-      B, C, H, W);
+      B, 4, H, W);
 
   }));
   return im2;
