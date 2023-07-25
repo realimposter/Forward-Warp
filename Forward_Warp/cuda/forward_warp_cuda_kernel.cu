@@ -216,15 +216,15 @@ __global__ void inpaint_nan_pixels_kernel(
             for (int neighbor_x = max(0, pixel_x - radius); neighbor_x <= min(H - 1, pixel_x + radius); ++neighbor_x) {
                 for (int neighbor_y = max(0, pixel_y - radius); neighbor_y <= min(W - 1, pixel_y + radius); ++neighbor_y) {
                     // foreach neighborig pixel
-                    const int neighbor_index = get_pixel_index(b, neighbor_x, neighbor_y, H, W);
+                    const int neighbor_index = get_pixel_index(b, neighbor_y, neighbor_x, H, W);
+                    const int neighbor_red = get_channel_index(b, 0, neighbor_y, neighbor_x, C, H, W);
+                    const int neighbor_green = get_channel_index(b, 1, neighbor_y, neighbor_x, C, H, W);
+                    const int neighbor_blue = get_channel_index(b, 2, neighbor_y, neighbor_x, C, H, W);
 
-                    // im1[red] = im1[(neighbor_index*C)+0];
-                    // im1[green] = im1[(neighbor_index*C)+1];
-                    // im1[blue] = im1[(neighbor_index*C)+2];
+                    im1[red] = im1[neighbor_red];
+                    im1[green] = im1[neighbor_green];
+                    im1[blue] = im1[neighbor_blue];
                     
-                    im1[red] = 255;
-                    im1[green] = 0;
-                    im1[blue] = 0;
                     // move on to next kernel loop NaN pixel
                     goto next_pixel;
 
