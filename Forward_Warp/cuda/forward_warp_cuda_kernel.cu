@@ -20,6 +20,7 @@ int get_channel_index(
     const size_t W) {
   return b*C*H*W + c*H*W + h*W + w;
 }
+static __forceinline__ __device__ 
 int get_pixel_index(
     const int b,
     const int h,
