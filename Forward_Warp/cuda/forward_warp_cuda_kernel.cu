@@ -181,7 +181,7 @@ __global__ void inpaint_nan_pixels_kernel(
 
     const int total_step = B * C * H * W;
     const int radius = 4;  // Add this line to define radius
-    const scalar_t threshold = 2.0;  // define the threshold for flowback vector difference
+    const scalar_t threshold = 1.0;  // define the threshold for flowback vector difference
 
     for (int iteration = 0; iteration < 64; ++iteration) {
         bool has_nan = false;
@@ -213,7 +213,7 @@ __global__ void inpaint_nan_pixels_kernel(
                 }
             }
 
-            if (count > 0) im1[index] = sum / count;
+            if (count > 0) im1[index] = sum / (count+1);
             else has_nan = true;  
         }
 
