@@ -222,7 +222,7 @@ __global__ void inpaint_nan_pixels_kernel(
                     scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
 
                     // if difference in flow is low, copy the pixel color, and move to next pixel
-                    if (flowback_diff < 2) {
+                    if (flowback_diff < 10) {
                         im1[red] = im1[neighbor_index*C+0];
                         im1[green] = im1[neighbor_index*C+1];
                         im1[blue] = im1[neighbor_index*C+2];
