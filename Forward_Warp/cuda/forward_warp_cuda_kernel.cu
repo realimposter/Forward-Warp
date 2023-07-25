@@ -173,15 +173,18 @@ __global__ void back_warp_kernel(
 template <typename scalar_t>
 __global__ void inpaint_nan_pixels_kernel(
     scalar_t* im1,
+    const scalar_t* flowback,
     const int B,
     const int C,
     const int H,
     const int W) {
+
     const int total_step = B * C * H * W;
     const int radius = 4;  // Add this line to define radius
+    const scalar_t threshold = 2.0;  // define the threshold for flowback vector difference
 
     for (int iteration = 0; iteration < 64; ++iteration) {
-        bool has_nan = false;  // Track if NaN pixels are found in the iteration
+        bool has_nan = false;
 
         CUDA_KERNEL_LOOP(index, total_step) {
             if (!isnan(im1[index])) continue;
@@ -194,24 +197,28 @@ __global__ void inpaint_nan_pixels_kernel(
             scalar_t sum = 0;
             int count = 0;
 
-            // Update loop bounds to consider a radius
             for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                     const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
                     if (!isnan(im1[neighbor_index])) {
-                        sum += im1[neighbor_index];
-                        ++count;
+                        // Calculate the absolute difference in flowback vector
+                        scalar_t flowback_diff = abs(flowback[index] - flowback[neighbor_index]);
+
+                        // Check if the flowback difference is below the threshold
+                        if (flowback_diff <= threshold) {
+                            sum += im1[neighbor_index];
+                            ++count;
+                        }
                     }
                 }
             }
 
             if (count > 0) im1[index] = sum / count;
-            else has_nan = true;  // Set has_nan to true if NaN pixels are found
+            else has_nan = true;  
         }
 
-        __syncthreads();  // Add this line to synchronize threads before starting the next iteration
+        __syncthreads(); 
 
-        // Break out of the loop if no NaN pixels are found
         if (!has_nan) break;
     }
 }
@@ -262,6 +269,7 @@ at::Tensor forward_warp_cuda_forward(
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       im2.data_ptr<scalar_t>(),
+      flowback.data_ptr<scalar_t>(),
       B, C, H, W);
 
   }));
