@@ -201,11 +201,11 @@ __global__ void inpaint_nan_pixels_kernel(
                     const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
                     if (!isnan(im1[neighbor_index])) {
 
-                        const scalar_t flow_x = flow[index*2+0];
-                        const scalar_t flow_y = flow[index*2+1];
+                        const scalar_t flow_x = flowback[index*2+0];
+                        const scalar_t flow_y = flowback[index*2+1];
 
-                        const scalar_t flow_x2 = flow[neighbor_index*2+0];
-                        const scalar_t flow_y2 = flow[neighbor_index*2+1];
+                        const scalar_t flow_x2 = flowback[neighbor_index*2+0];
+                        const scalar_t flow_y2 = flowback[neighbor_index*2+1];
 
                         scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
 
