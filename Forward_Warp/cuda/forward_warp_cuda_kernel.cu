@@ -200,18 +200,14 @@ __global__ void inpaint_nan_pixels_kernel(
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                     const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
                     if (!isnan(im1[neighbor_index])) {
-                        scalar_t flowback_diff = abs(flowback[index] - flowback[neighbor_index]);
+                        // scalar_t flowback_diff = abs(flowback[index] - flowback[neighbor_index]);
                         // cap the flowback difference to 1
                         // flowback_diff = min(flowback_diff, (scalar_t)1);
                         // if (flowback_diff < 0.1){
                         // if neighbor_index is an even number
                         if(neighbor_index % 2 == 0){
                           sum += im1[neighbor_index];
-                          ++count;
-                          // end loop
-                          if(count > 1){
-                            i = H;
-                          }
+                          count=count+1;
                         }
                     }
                 }
