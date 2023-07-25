@@ -11,14 +11,17 @@ using at::native::detail::GridSamplerInterpolation;
 
 static __forceinline__ __device__ 
 int get_channel_index(
-    const int b,
-    const int c,
-    const int h,
-    const int w,
-    const size_t C,
-    const size_t H,
-    const size_t W) {
-  return b*C*H*W + c*H*W + h*W + w;
+    const int b,       // batch index
+    const int w,       // width index
+    const int h,       // height index
+    const int c,       // channel index
+    const size_t B,    // number of batches
+    const size_t C,    // number of channels
+    const size_t W     // width of the image
+    const size_t H,    // height of the image
+) {
+    // Return the linear index
+    return b*C*H*W + c*H*W + h*W + w;
 }
 static __forceinline__ __device__ 
 int get_pixel_index(
@@ -132,7 +135,7 @@ __global__ void back_warp_kernel(
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
         const int w = index % W;
-        
+
         const scalar_t x = (scalar_t)w + flow[index*2+0];
         const scalar_t y = (scalar_t)h + flow[index*2+1];
 
@@ -195,16 +198,18 @@ __global__ void inpaint_nan_pixels_kernel(
     for (int iteration = 0; iteration < 24; ++iteration) {
         nan_count = 0;
         CUDA_KERNEL_LOOP(index, total_step) {
-            index+=1;
-            int red = (index * C) + 0;
-            int green = (index * C) + 1;
-            int blue = (index * C) + 2;
-            // make sure at least one of the pixels is NaN before infilling
-            if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) continue;
+
             nan_count += 1;
             const int b = index / (H * W);
             const int pixel_x = (index - b * H * W) / W;
             const int pixel_y = index % W;
+
+            int red = get_channel_index(b, 0, pixel_x, pixel_y, C, W, H);
+            int green = get_channel_index(b, 1, pixel_x, pixel_y, C, W, H);
+            int blue = get_channel_index(b, 2, pixel_x, pixel_y, C, W, H);
+            
+            // make sure at least one of the pixels is NaN before infilling
+            if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) continue;
 
             const scalar_t flow_x = flowback[index*2+0];
             const scalar_t flow_y = flowback[index*2+1];
@@ -218,10 +223,10 @@ __global__ void inpaint_nan_pixels_kernel(
                     // im1[red] = im1[(neighbor_index*C)+0];
                     // im1[green] = im1[(neighbor_index*C)+1];
                     // im1[blue] = im1[(neighbor_index*C)+2];
-
-                    im1[red] = 1;
+                    
+                    im1[red] = 255;
                     im1[green] = 0;
-                    im1[blue] = 1;
+                    im1[blue] = 0;
                     // move on to next kernel loop NaN pixel
                     goto next_pixel;
 
