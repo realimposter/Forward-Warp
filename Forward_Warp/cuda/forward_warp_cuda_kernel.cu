@@ -201,7 +201,9 @@ __global__ void inpaint_nan_pixels_kernel(
                     const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
                     if (!isnan(im1[neighbor_index])) {
                         scalar_t flowback_diff = abs(flowback[index] - flowback[neighbor_index]);
-                        if (flowback_diff < 1000000000000){
+                        // cap the flowback difference to 1
+                        flowback_diff = min(flowback_diff, (scalar_t)1);
+                        if (flowback_diff < 10){
                           sum += im1[neighbor_index];
                           ++count;
                         }
