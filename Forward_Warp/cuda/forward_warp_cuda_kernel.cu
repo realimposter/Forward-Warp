@@ -119,7 +119,7 @@ __global__ void back_warp_kernel(
     const int C,
     const int H,
     const int W) {
-    int dilate_radius = 24; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    int dilate_radius = 1; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
