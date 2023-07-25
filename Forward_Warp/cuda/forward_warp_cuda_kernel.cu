@@ -199,7 +199,7 @@ __global__ void inpaint_nan_pixels_kernel(
             int green = index * C + 1;
             int blue = index * C + 2;
             // make sure at least one of the pixels is NaN
-            if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) break;
+            if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) continue;
             nan_count += 1;
             const int b = index / (H * W);
             const int h = (index - b * H * W) / W;
@@ -212,7 +212,7 @@ __global__ void inpaint_nan_pixels_kernel(
             for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                     // foreach neighborig pixel
-                    const int neighbor_index = get_pixel_index(b, i, j, H, W);
+                    const int neighbor_index = get_pixel_index(b, i, j, H, W);;
                     // if pixel is NaN skip to next neighboring pixel
                     if (isnan(im1[neighbor_index*C])) continue;
 
