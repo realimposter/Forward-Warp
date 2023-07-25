@@ -173,7 +173,6 @@ __global__ void back_warp_kernel(
 template <typename scalar_t>
 __global__ void inpaint_nan_pixels_kernel(
     scalar_t* im1,
-    scalar_t* im_out,
     const scalar_t* flowback,
     const int B,
     const int C,
@@ -201,8 +200,16 @@ __global__ void inpaint_nan_pixels_kernel(
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                     const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
                     if (!isnan(im1[neighbor_index])) {
-                        scalar_t flowback_diff = abs(flowback[index] - flowback[neighbor_index]);
-                        if (flowback_diff < 0.1){
+
+                        const scalar_t flow_x = flow[index*2+0];
+                        const scalar_t flow_y = flow[index*2+1];
+
+                        const scalar_t flow_x2 = flow[neighbor_index*2+0];
+                        const scalar_t flow_y2 = flow[neighbor_index*2+1];
+
+                        scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
+
+                        if (flowback_diff < 0.5){
                           sum += im1[neighbor_index];
                           count=count+1;
                         }
@@ -210,7 +217,7 @@ __global__ void inpaint_nan_pixels_kernel(
                 }
             }
 
-            if (count > 0) im_out[index] = sum / count;
+            if (count > 0) im1[index] = sum / count;
             else has_nan = true;  // Set has_nan to true if NaN pixels are found
         }
 
@@ -228,7 +235,6 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
-  auto innpainted = at::zeros_like(im0);
   auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
   const int B = im0.size(0);
   const int C = im0.size(1);
@@ -268,10 +274,9 @@ at::Tensor forward_warp_cuda_forward(
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       im2.data_ptr<scalar_t>(),
-      innpainted.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
       B, C, H, W);
 
   }));
-  return innpainted;
+  return im2;
 }
