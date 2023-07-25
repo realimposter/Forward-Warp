@@ -207,7 +207,7 @@ __global__ void inpaint_nan_pixels_kernel(
                           sum += im1[neighbor_index];
                           ++count;
                           // end loop
-                          if count > 1{
+                          if(count > 1){
                             i = H;
                           }
                         }
