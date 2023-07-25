@@ -298,7 +298,7 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_pixels), CUDA_NUM_THREADS>>>(
       im2.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
-      B, 4, H, W);
+      B, 3, H, W);
 
   }));
   return im2;
