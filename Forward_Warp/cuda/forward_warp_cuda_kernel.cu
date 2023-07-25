@@ -178,13 +178,11 @@ __global__ void inpaint_nan_pixels_kernel(
     const int C,
     const int H,
     const int W) {
-
     const int total_step = B * C * H * W;
     const int radius = 4;  // Add this line to define radius
-    const scalar_t threshold = 0.01;  // define the threshold for flowback vector difference
 
-    for (int iteration = 0; iteration < 64; ++iteration) {
-        bool has_nan = false;
+    for (int iteration = 0; iteration < 24; ++iteration) {
+        bool has_nan = false;  // Track if NaN pixels are found in the iteration
 
         CUDA_KERNEL_LOOP(index, total_step) {
             if (!isnan(im1[index])) continue;
@@ -197,28 +195,24 @@ __global__ void inpaint_nan_pixels_kernel(
             scalar_t sum = 0;
             int count = 0;
 
+            // Update loop bounds to consider a radius
             for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                     const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
                     if (!isnan(im1[neighbor_index])) {
-                        // Calculate the absolute difference in flowback vector
-                        scalar_t flowback_diff = abs(flowback[index] - flowback[neighbor_index]);
-
-                        // Check if the flowback difference is below the threshold
-                        // if (flowback_diff <= threshold) {
-                            sum += im1[neighbor_index];
-                            ++count;
-                        // }
+                        sum += im1[neighbor_index];
+                        ++count;
                     }
                 }
             }
 
             if (count > 0) im1[index] = sum / count;
-            else has_nan = true;  
+            else has_nan = true;  // Set has_nan to true if NaN pixels are found
         }
 
-        __syncthreads(); 
+        __syncthreads();  // Add this line to synchronize threads before starting the next iteration
 
+        // Break out of the loop if no NaN pixels are found
         if (!has_nan) break;
     }
 }
