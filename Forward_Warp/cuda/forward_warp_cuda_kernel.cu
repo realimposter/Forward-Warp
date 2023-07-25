@@ -10,7 +10,7 @@
 using at::native::detail::GridSamplerInterpolation;
 
 static __forceinline__ __device__ 
-int get_im_index(
+int get_channel_index(
     const int b,
     const int c,
     const int h,
@@ -19,6 +19,14 @@ int get_im_index(
     const size_t H,
     const size_t W) {
   return b*C*H*W + c*H*W + h*W + w;
+}
+int get_pixel_index(
+    const int b,
+    const int h,
+    const int w,
+    const size_t H,
+    const size_t W) {
+  return b*H*W + h*W + w;
 }
 
 template <typename scalar_t>
@@ -55,7 +63,7 @@ __global__ void forward_warp_cuda_forward_kernel(
             }
         }
 
-        // Check if the largest_flow_amplitude is more than 4 greater than current pixel amplitude
+        // Check if the largest_flow_amplitude is more than x greater than current pixel amplitude
         const scalar_t current_flow_amplitude = hypotf(flow[index*2+0], flow[index*2+1]);
         if ((largest_flow_amplitude - current_flow_amplitude) > 3) {
             // Update flow
@@ -76,9 +84,9 @@ __global__ void forward_warp_cuda_forward_kernel(
                 const scalar_t ne_k = (x - x_f) * (y_c - y);
                 const scalar_t sw_k = (x_c - x) * (y - y_f);
                 const scalar_t se_k = (x - x_f) * (y - y_f);
-                const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
-                scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
-                scalar_t* white_im1_p = white_im1+get_im_index(b, 0, y_f, x_f, C, H, W); // added warped white image
+                const scalar_t* im0_p = im0+get_channel_index(b, 0, h, w, C, H, W);
+                scalar_t* im1_p = im1+get_channel_index(b, 0, y_f, x_f, C, H, W);
+                scalar_t* white_im1_p = white_im1+get_channel_index(b, 0, y_f, x_f, C, H, W); // added warped white image
                 for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W, white_im1_p+=H*W){
                     atomicAdd(im1_p,     nw_k*(*im0_p));
                     atomicAdd(im1_p+1,   ne_k*(*im0_p));
@@ -95,9 +103,9 @@ __global__ void forward_warp_cuda_forward_kernel(
             const int x_nearest = static_cast<int>(::round(x));
             const int y_nearest = static_cast<int>(::round(y));
             if (x_nearest >= 0 && x_nearest < W && y_nearest >= 0 && y_nearest < H) {
-                const scalar_t* im0_p = im0 + get_im_index(b, 0, h, w, C, H, W);
-                scalar_t* im1_p = im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
-                scalar_t* white_im1_p = white_im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W); // added warped white image
+                const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
+                scalar_t* im1_p = im1 + get_channel_index(b, 0, y_nearest, x_nearest, C, H, W);
+                scalar_t* white_im1_p = white_im1 + get_channel_index(b, 0, y_nearest, x_nearest, C, H, W); // added warped white image
                 for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W, white_im1_p += H*W) {
                     *im1_p = *im0_p;
                     *white_im1_p = 1; // set pixel value to 1 for the warped white image
@@ -178,52 +186,56 @@ __global__ void inpaint_nan_pixels_kernel(
     const int C,
     const int H,
     const int W) {
-    const int total_step = B * C * H * W;
+    const int total_step = H * W;
     const int radius = 4;  // Add this line to define radius
 
+    __shared__ int nan_count;
+
     for (int iteration = 0; iteration < 24; ++iteration) {
-        bool has_nan = false;  // Track if NaN pixels are found in the iteration
-
+        nan_count = 0;
         CUDA_KERNEL_LOOP(index, total_step) {
-            if (!isnan(im1[index])) continue;
-
-            const int b = index / (C * H * W);
-            const int c = (index - b * C * H * W) / (H * W);
-            const int h = (index - b * C * H * W - c * H * W) / W;
+            int red = index * C + 0;
+            int green = index * C + 1;
+            int blue = index * C + 2;
+            if (!isnan(im1[red])) continue;
+            nan_count += 1;
+            const int b = index / (H * W);
+            const int h = (index - b * H * W) / W;
             const int w = index % W;
 
-            scalar_t sum = 0;
-            int count = 0;
+            const scalar_t flow_x = flowback[index*2+0];
+            const scalar_t flow_y = flowback[index*2+1];
 
-            // Update loop bounds to consider a radius
+            // foreach pixel in a radious of "radius" arounnd index
             for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
-                    const int neighbor_index = get_im_index(b, c, i, j, C, H, W);
-                    if (!isnan(im1[neighbor_index])) {
+                    // foreach neighborig pixel
+                    const int neighbor_index = get_pixel_index(b, i, j, H, W);
+                    // if pixel is NaN skip to next neighboring pixel
+                    if (isnan(im1[neighbor_index*C])) continue;
 
-                        const scalar_t flow_x = flowback[index*2+0];
-                        const scalar_t flow_y = flowback[index*2+1];
-                        const scalar_t flow_x2 = flowback[neighbor_index*2+0];
-                        const scalar_t flow_y2 = flowback[neighbor_index*2+1];
-                        scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
+                    //calculate difference in flow vectors
+                    const scalar_t flow_x2 = flowback[neighbor_index*2+0];
+                    const scalar_t flow_y2 = flowback[neighbor_index*2+1];
+                    scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
 
-                        if (flowback_diff < 0.0001){
-                          sum += im1[neighbor_index];
-                          count=count+1;
-                          break;
-                        }
+                    // if difference in flow is low, copy the pixel color, and move to next pixel
+                    if (flowback_diff < 0.1) {
+                        im1[red] = im1[neighbor_index*C+0];
+                        im1[green] = im1[neighbor_index*C+1];
+                        im1[blue] = im1[neighbor_index*C+2];
+                        // move on to next kernel loop NaN pixel
+                        goto next_pixel;
                     }
                 }
             }
-
-            if (count > 0) im1[index] = (sum / count);
-            else has_nan = true;  // Set has_nan to true if NaN pixels are found
+            next_pixel:;
         }
 
         __syncthreads();  // Add this line to synchronize threads before starting the next iteration
 
         // Break out of the loop if no NaN pixels are found
-        if (!has_nan) break;
+        if (nan_count == 0) break;
     }
 }
 
@@ -240,6 +252,7 @@ at::Tensor forward_warp_cuda_forward(
   const int H = im0.size(2);
   const int W = im0.size(3);
   const int total_step = B * H * W;
+  const int total_pixels = H * W;
   AT_DISPATCH_FLOATING_TYPES(im0.scalar_type(), "forward_warp_forward_cuda", ([&] {
 
     /////////// FORWARD WARP ////////////
@@ -271,7 +284,7 @@ at::Tensor forward_warp_cuda_forward(
 
     /////// INPAINTING //////////
     inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+    <<<GET_BLOCKS(total_pixels), CUDA_NUM_THREADS>>>(
       im2.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
       B, C, H, W);
