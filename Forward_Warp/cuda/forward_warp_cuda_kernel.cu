@@ -12,13 +12,13 @@ using at::native::detail::GridSamplerInterpolation;
 static __forceinline__ __device__ 
 int get_channel_index(
     const int b,       // batch index
-    const int w,       // width index
     const int h,       // height index
+    const int w,       // width index
     const int c,       // channel index
     const size_t B,    // number of batches
     const size_t C,    // number of channels
-    const size_t W     // width of the image
     const size_t H,    // height of the image
+    const size_t W     // width of the image
 ) {
     // Return the linear index
     return b*C*H*W + c*H*W + h*W + w;
@@ -204,10 +204,10 @@ __global__ void inpaint_nan_pixels_kernel(
             const int pixel_x = (index - b * H * W) / W;
             const int pixel_y = index % W;
 
-            int red = get_channel_index(b, 0, pixel_x, pixel_y, C, W, H);
-            int green = get_channel_index(b, 1, pixel_x, pixel_y, C, W, H);
-            int blue = get_channel_index(b, 2, pixel_x, pixel_y, C, W, H);
-            
+            int red = get_channel_index(b, 0, pixel_y, pixel_x, C, H, W);
+            int green = get_channel_index(b, 1, pixel_y, pixel_x, C, H, W);
+            int blue = get_channel_index(b, 2, pixel_y, pixel_x, C, H, W);
+
             // make sure at least one of the pixels is NaN before infilling
             if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) continue;
 
