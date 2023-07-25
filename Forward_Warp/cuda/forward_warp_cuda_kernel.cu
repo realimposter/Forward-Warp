@@ -198,7 +198,8 @@ __global__ void inpaint_nan_pixels_kernel(
             int red = index * C + 0;
             int green = index * C + 1;
             int blue = index * C + 2;
-            if (!isnan(im1[red])) continue;
+            // loop over each NaN pixel
+            if (!isnan(im1[red])) break;
             nan_count += 1;
             const int b = index / (H * W);
             const int h = (index - b * H * W) / W;
