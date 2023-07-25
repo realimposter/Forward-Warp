@@ -212,23 +212,32 @@ __global__ void inpaint_nan_pixels_kernel(
             for (int i = max(0, h - radius); i <= min(H - 1, h + radius); ++i) {
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                     // foreach neighborig pixel
-                    const int neighbor_index = get_pixel_index(b, i, j, H, W);;
-                    // if rgb pixel is NaN skip to next neighboring pixel
-                    if (isnan(im1[neighbor_index*C]) && isnan(im1[(neighbor_index*C)+1]) && isnan(im1[(neighbor_index*C)+1])) continue;
+                    const int neighbor_index = get_pixel_index(b, i, j, H, W);
 
-                    //calculate difference in flow vectors
-                    const scalar_t flow_x2 = flowback[neighbor_index*2+0];
-                    const scalar_t flow_y2 = flowback[neighbor_index*2+1];
-                    scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
 
-                    // if difference in flow is low, copy the pixel color, and move to next pixel
-                    if (flowback_diff < 100) {
-                        im1[red] = im1[(neighbor_index*C)+0];
-                        im1[green] = im1[(neighbor_index*C)+1];
-                        im1[blue] = im1[(neighbor_index*C)+2];
-                        // move on to next kernel loop NaN pixel
-                        goto next_pixel;
-                    }
+                    im1[red] = im1[(neighbor_index*C)+0];
+                    im1[green] = im1[(neighbor_index*C)+1];
+                    im1[blue] = im1[(neighbor_index*C)+2];
+                    // move on to next kernel loop NaN pixel
+                    goto next_pixel;
+
+
+                    // // if rgb pixel is NaN skip to next neighboring pixel
+                    // if (isnan(im1[neighbor_index*C]) && isnan(im1[(neighbor_index*C)+1]) && isnan(im1[(neighbor_index*C)+1])) continue;
+
+                    // //calculate difference in flow vectors
+                    // const scalar_t flow_x2 = flowback[neighbor_index*2+0];
+                    // const scalar_t flow_y2 = flowback[neighbor_index*2+1];
+                    // scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
+
+                    // // if difference in flow is low, copy the pixel color, and move to next pixel
+                    // if (flowback_diff < 100) {
+                    //     im1[red] = im1[(neighbor_index*C)+0];
+                    //     im1[green] = im1[(neighbor_index*C)+1];
+                    //     im1[blue] = im1[(neighbor_index*C)+2];
+                    //     // move on to next kernel loop NaN pixel
+                    //     goto next_pixel;
+                    // }
                 }
             }
             next_pixel:;
