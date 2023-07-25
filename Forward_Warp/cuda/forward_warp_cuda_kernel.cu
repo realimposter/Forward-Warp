@@ -195,10 +195,10 @@ __global__ void inpaint_nan_pixels_kernel(
     for (int iteration = 0; iteration < 24; ++iteration) {
         nan_count = 0;
         CUDA_KERNEL_LOOP(index, total_step) {
-            int red = index * C + 0;
-            int green = index * C + 1;
-            int blue = index * C + 2;
-            // make sure at least one of the pixels is NaN
+            int red = (index * C) + 0;
+            int green = (index * C) + 1;
+            int blue = (index * C) + 2;
+            // make sure at least one of the pixels is NaN before infilling
             if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) continue;
             nan_count += 1;
             const int b = index / (H * W);
@@ -213,8 +213,8 @@ __global__ void inpaint_nan_pixels_kernel(
                 for (int j = max(0, w - radius); j <= min(W - 1, w + radius); ++j) {
                     // foreach neighborig pixel
                     const int neighbor_index = get_pixel_index(b, i, j, H, W);;
-                    // if pixel is NaN skip to next neighboring pixel
-                    if (isnan(im1[neighbor_index*C])) continue;
+                    // if rgb pixel is NaN skip to next neighboring pixel
+                    if (isnan(im1[neighbor_index*C]) && isnan(im1[(neighbor_index*C)+1]) && isnan(im1[(neighbor_index*C)+1])) continue;
 
                     //calculate difference in flow vectors
                     const scalar_t flow_x2 = flowback[neighbor_index*2+0];
@@ -223,9 +223,9 @@ __global__ void inpaint_nan_pixels_kernel(
 
                     // if difference in flow is low, copy the pixel color, and move to next pixel
                     if (flowback_diff < 100) {
-                        im1[red] = im1[neighbor_index*C+0];
-                        im1[green] = im1[neighbor_index*C+1];
-                        im1[blue] = im1[neighbor_index*C+2];
+                        im1[red] = im1[(neighbor_index*C)+0];
+                        im1[green] = im1[(neighbor_index*C)+1];
+                        im1[blue] = im1[(neighbor_index*C)+2];
                         // move on to next kernel loop NaN pixel
                         goto next_pixel;
                     }
