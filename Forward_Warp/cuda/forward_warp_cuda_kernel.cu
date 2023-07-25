@@ -209,7 +209,7 @@ __global__ void inpaint_nan_pixels_kernel(
 
                         scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
 
-                        if (flowback_diff < 0.5){
+                        if (flowback_diff < 10){
                           sum += im1[neighbor_index];
                           count=count+1;
                         }
@@ -217,7 +217,7 @@ __global__ void inpaint_nan_pixels_kernel(
                 }
             }
 
-            if (count > 0) im1[index] = (sum / count)-1;
+            if (count > 0) im1[index] = (sum / count);
             else has_nan = true;  // Set has_nan to true if NaN pixels are found
         }
 
