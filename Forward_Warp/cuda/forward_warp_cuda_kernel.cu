@@ -206,6 +206,8 @@ __global__ void inpaint_nan_pixels_kernel(
                         if (flowback_diff < 1.1){
                           sum += im1[neighbor_index];
                           ++count;
+                          // end loop
+                          i = H;
                         }
                     }
                 }
