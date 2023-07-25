@@ -11,18 +11,16 @@ using at::native::detail::GridSamplerInterpolation;
 
 static __forceinline__ __device__ 
 int get_channel_index(
-    const int b,       // batch index
-    const int h,       // height index
-    const int w,       // width index
-    const int c,       // channel index
-    const size_t B,    // number of batches
-    const size_t C,    // number of channels
-    const size_t H,    // height of the image
-    const size_t W     // width of the image
-) {
-    // Return the linear index
-    return b*C*H*W + c*H*W + h*W + w;
+    const int b,
+    const int c,
+    const int h,
+    const int w,
+    const size_t C,
+    const size_t H,
+    const size_t W) {
+  return b*C*H*W + c*H*W + h*W + w;
 }
+
 static __forceinline__ __device__ 
 int get_pixel_index(
     const int b,
