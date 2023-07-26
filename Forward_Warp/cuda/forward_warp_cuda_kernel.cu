@@ -183,8 +183,7 @@ __global__ void back_warp_kernel(
 template <typename scalar_t>
 __global__ void inpaint_nan_pixels_kernel(
     const int total_step,
-    const scalar_t* im0,
-    scalar_t* im1,
+    scalar_t* im0,
     const scalar_t* flow,
     const int B,
     const int C,
@@ -237,10 +236,10 @@ __global__ void inpaint_nan_pixels_kernel(
                     // if (flowDiff > 50) continue;
 
                     // else copy the neighbor pixel value to the current pixel
-                    const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
-                    scalar_t* im1_p = im1 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
+                    scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
+                    scalar_t* im1_p = im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
                     for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W) {
-                        *im1_p = *im0_p;
+                        *im0_p = *im1_p;
                     }
 
                     // end both of the loops
@@ -307,13 +306,8 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       im2.data_ptr<scalar_t>(),
-      inpainted.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
       B, C, H, W);
-
-    //////// combine im2 NaNs with inpainted image ////////
-    auto nan_mask = at::isnan(im2);
-    im2 = at::where(nan_mask, inpainted, im2);
 
   }));
   return im2;
