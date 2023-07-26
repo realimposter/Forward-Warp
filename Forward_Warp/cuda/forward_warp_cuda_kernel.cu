@@ -264,5 +264,5 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
   }));
-  return forward_mask;
+  return im2;
 }
