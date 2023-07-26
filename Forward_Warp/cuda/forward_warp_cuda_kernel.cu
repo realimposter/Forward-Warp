@@ -190,7 +190,7 @@ __global__ void inpaint_nan_pixels_kernel(
     const int C,
     const int H,
     const int W) {
-    const int radius = 4;  
+    const int radius = 12;  
 
     __shared__ int nan_count;
 
