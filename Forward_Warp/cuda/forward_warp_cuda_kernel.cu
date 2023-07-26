@@ -234,7 +234,7 @@ __global__ void inpaint_nan_pixels_kernel(
                     const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
 
                     // if the flows are different, move on to the next neighbor.
-                    if (flowDiff > 0.01) continue;
+                    if (flowDiff > 1) continue;
 
                     // add the neighbor pixel value to the sum
                     scalar_t* im1_p = im0 + neighbor_index;
