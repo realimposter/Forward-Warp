@@ -103,7 +103,7 @@ __global__ void create_mask_kernel(
 
         const int pixel_index = get_channel_index(b, 0, h, w, 1, H, W);
 
-        mask[pixel_index] = flow_x;
+        mask[pixel_index] = flow_x*255;
 
         // const int new_x = w + flow_x;
         // const int new_y = h + flow_y;
@@ -225,20 +225,20 @@ at::Tensor forward_warp_cuda_forward(
       flow.data_ptr<scalar_t>(),
       B, C, H, W);
 
-    //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    // Create a tensor of the same size as `im2`, filled with NaN
-    auto nan_tensor = im2.clone().fill_(std::numeric_limits<float>::quiet_NaN());
-    auto mask = at::eq(forward_mask, 0.0);
-    im2 = at::where(mask, im2, nan_tensor);
+    // //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
+    // // Create a tensor of the same size as `im2`, filled with NaN
+    // auto nan_tensor = im2.clone().fill_(std::numeric_limits<float>::quiet_NaN());
+    // auto mask = at::eq(forward_mask, 0.0);
+    // im2 = at::where(mask, im2, nan_tensor);
 
-    /////// INPAINT HOLES //////////
-    inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      im2.data_ptr<scalar_t>(),
-      flowback.data_ptr<scalar_t>(),
-      B, C, H, W);
+    // /////// INPAINT HOLES //////////
+    // inpaint_nan_pixels_kernel<scalar_t>
+    // <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+    //   total_step,
+    //   im2.data_ptr<scalar_t>(),
+    //   flowback.data_ptr<scalar_t>(),
+    //   B, C, H, W);
 
   }));
-  return forward_mask * 255;
+  return forward_mask;
 }
