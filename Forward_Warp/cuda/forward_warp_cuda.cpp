@@ -27,7 +27,7 @@ at::Tensor forward_warp_forward(
     const int inpaint_search_radius,
     const float inpaint_motion_threshold,
     const int max_iterations,
-    cosnt int mask_dilation){
+    const int mask_dilation){
   // CHECK_INPUT(im0);
   // CHECK_INPUT(flow);
   return forward_warp_cuda_forward(im0, flow, flowback, (GridSamplerInterpolation)interpolation_mode, inpaint_search_radius, inpaint_motion_threshold,max_iterations,mask_dilation);
