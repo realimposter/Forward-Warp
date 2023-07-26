@@ -232,9 +232,8 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    auto nan_mask = at::isnan(mask);
-    // Use at::where to copy NaN values to the output image
-    output_image = at::where(nan_mask, mask, mask);
+    auto condition_mask = mask < 1;
+    output_image = at::where(condition_mask, mask, output_image);
 
     // /////// INPAINT HOLES //////////
     // inpaint_nan_pixels_kernel<scalar_t>
