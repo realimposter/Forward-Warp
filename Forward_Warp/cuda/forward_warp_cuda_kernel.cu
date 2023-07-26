@@ -96,7 +96,6 @@ __global__ void forward_mask_kernel(
     const int b = index / (H * W);
     const int h = (index-b*H*W) / W;
     const int w = index % W;
-
     // Initialize largest_flow_amplitude and its location
     scalar_t largest_flow_amplitude = -1;
     int largest_loc = -1;
@@ -112,7 +111,6 @@ __global__ void forward_mask_kernel(
             }
         }
     }
-
     // Check if the largest_flow_amplitude is more than 4 greater than current pixel amplitude
     const scalar_t current_flow_amplitude = hypotf(flow[index*2+0], flow[index*2+1]);
     if ((largest_flow_amplitude - current_flow_amplitude) > 3) {
@@ -144,7 +142,39 @@ __global__ void forward_mask_kernel(
       }
     }
   }
+}
 
+__global__ void dialate_kernel(
+    const int total_step,
+    scalar_t* im1,
+    const int radius,
+    const int B,
+    const int C,
+    const int H,
+    const int W) {
+  CUDA_KERNEL_LOOP(index, total_step) {
+    const int b = index / (H * W * C);
+    const int c = (index / (H * W)) % C;
+    const int h = (index / W) % H;
+    const int w = index % W;
+
+    bool set_nan = false;
+    for(int i = max(0, h - radius); i <= min(H - 1, h + radius); i++) {
+      for(int j = max(0, w - radius); j <= min(W - 1, w + radius); j++) {
+        const scalar_t* pixel = im1 + get_channel_index(b, c, i, j, C, H, W);
+        if(*pixel == 0) {
+          set_nan = true;
+          break;
+        }
+      }
+      if(set_nan) break;
+    }
+
+    if(set_nan) {
+      scalar_t* target_pixel = im1 + get_channel_index(b, c, h, w, C, H, W);
+      *target_pixel = NAN;
+    }
+  }
 }
 
 template <typename scalar_t>
@@ -258,9 +288,16 @@ at::Tensor forward_warp_cuda_forward(
       mask.data_ptr<scalar_t>(),
       B, C, H, W);
 
+    /////// DIALATE MASK //////////
+    forward_mask_kernel<scalar_t>
+    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+      total_step,
+      mask.data_ptr<scalar_t>(),
+      3,
+      B, C, H, W);
+
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    auto nan_tensor = at::full_like(output_image, NAN);
-    output_image = at::where(mask == 0, nan_tensor, output_image);
+    output_image = at::where(isnan(mask), mask, output_image);
 
     // /////// INPAINT HOLES //////////
     // inpaint_nan_pixels_kernel<scalar_t>
