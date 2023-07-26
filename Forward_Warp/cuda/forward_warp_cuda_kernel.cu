@@ -227,7 +227,13 @@ __global__ void inpaint_nan_pixels_kernel(
             scalar_t sum[3] = {0}; // Initialize array with zeros
             for (int neighbor_w = max(0, w - radius); neighbor_w <= min(W - 1, w + radius); ++neighbor_w) {
                 for (int neighbor_h = max(0, h - radius); neighbor_h <= min(H - 1, h + radius); ++neighbor_h) {
-                    // get current neighbor pixel
+                    // get neighbor index
+                    const int neighbor_index = get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
+
+                    // // if neighbor pixel is Nan, move on to the next neighbor
+                    // if (isnan(*(im0 + neighbor_index))) continue;
+
+                     // get current neighbor pixel
                     const scalar_t* neighbor_p = im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
                     // make sure pixel is not NaN, if it is move to next loop
                     bool neighbor_nan_detected = false;
@@ -238,6 +244,7 @@ __global__ void inpaint_nan_pixels_kernel(
                         }
                     }
                     if(neighbor_nan_detected) continue;
+
 
 
                     // get neighbor flow
@@ -252,7 +259,7 @@ __global__ void inpaint_nan_pixels_kernel(
                     if (flowDiff > motion_threshold) continue;
 
                     // add the neighbor pixel value to the sum
-                    const scalar_t* im1_p = im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
+                    scalar_t* im1_p = im0 + neighbor_index;
                     for (int c = 0; c < C; ++c, im1_p += H*W) {
                         sum[c] += *im1_p;
                     }
