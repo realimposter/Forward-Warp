@@ -84,8 +84,8 @@ __global__ void back_warp_kernel(
 template <typename scalar_t>
 __global__ void create_mask_kernel(
     const int total_step,
-    scalar_t* flow,
     scalar_t* mask,
+    const scalar_t* flow,
     const int B,
     const int C,
     const int H,
@@ -202,7 +202,7 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
-  auto forward_mask = at::zeros_like(im0);
+  auto forward_mask = at::ones_like(im0);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
