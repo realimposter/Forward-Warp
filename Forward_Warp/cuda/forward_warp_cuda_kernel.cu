@@ -193,7 +193,7 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
-  auto mask = at::zeros_like(im0);
+  auto forward_mask = at::zeros_like(im0);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
@@ -215,13 +215,15 @@ at::Tensor forward_warp_cuda_forward(
     create_mask_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      mask.data_ptr<scalar_t>(),
+      forward_mask.data_ptr<scalar_t>(),
       flow.data_ptr<scalar_t>(),
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
     // Create a tensor of the same size as `im2`, filled with NaN
     auto nan_tensor = im2.clone().fill_(std::numeric_limits<float>::quiet_NaN());
+    // create mask where forward_mask value is 1.0
+    auto mask = at::eq(forward_mask, 1.0);
     im2 = at::where(mask, im2, nan_tensor);
 
     /////// INPAINT HOLES //////////
