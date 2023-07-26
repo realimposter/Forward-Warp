@@ -186,11 +186,12 @@ __global__ void inpaint_nan_pixels_kernel(
     const int total_step,
     scalar_t* im0,
     const scalar_t* flow,
+    const int radius,
+    const scalar_t motion_threshold,
     const int B,
     const int C,
     const int H,
     const int W) {
-    const int radius = 6;  
 
     __shared__ int nan_count;
 
@@ -234,7 +235,7 @@ __global__ void inpaint_nan_pixels_kernel(
                     const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
 
                     // if the flows are different, move on to the next neighbor.
-                    if (flowDiff > 10) continue;
+                    if (flowDiff > motion_threshold) continue;
 
                     // add the neighbor pixel value to the sum
                     scalar_t* im1_p = im0 + neighbor_index;
@@ -278,6 +279,8 @@ at::Tensor forward_warp_cuda_forward(
   const int H = input_image.size(2);
   const int W = input_image.size(3);
   const int total_step = B * H * W;
+  const int inpaint_search_radius = 12;
+  const scalar_t inpaint_motion_threshold = 5;
   AT_DISPATCH_FLOATING_TYPES(input_image.scalar_type(), "forward_warp_forward_cuda", ([&] {
     
     /////// WARP BACKWARDS //////////
@@ -315,6 +318,8 @@ at::Tensor forward_warp_cuda_forward(
       total_step,
       output_image.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
+      inpaint_search_radius,
+      inpaint_motion_threshold,
       B, C, H, W);
 
   }));
