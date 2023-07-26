@@ -8,7 +8,9 @@ at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0, 
     const at::Tensor flow,
     const at::Tensor flowback,
-    const GridSamplerInterpolation interpolation_mode);
+    const GridSamplerInterpolation interpolation_mode,
+    const int inpaint_search_radius,
+    const float inpaint_motion_threshold);
 
 // Because of the incompatible of Pytorch 1.0 && Pytorch 0.4, we have to annotation this.
 #define CHECK_CUDA(x) AT_ASSERT(x.is_cuda(), #x " must be a CUDA tensor")
@@ -19,10 +21,12 @@ at::Tensor forward_warp_forward(
     const at::Tensor im0, 
     const at::Tensor flow,
     const at::Tensor flowback,
-    const int interpolation_mode){
+    const int interpolation_mode,
+    const int inpaint_search_radius,
+    const float inpaint_motion_threshold){
   // CHECK_INPUT(im0);
   // CHECK_INPUT(flow);
-  return forward_warp_cuda_forward(im0, flow, flowback, (GridSamplerInterpolation)interpolation_mode);
+  return forward_warp_cuda_forward(im0, flow, flowback, (GridSamplerInterpolation)interpolation_mode, inpaint_search_radius, inpaint_motion_threshold);
 }
 
 PYBIND11_MODULE(
