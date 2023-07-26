@@ -290,7 +290,8 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode,
     const int inpaint_search_radius,
     const float inpaint_motion_threshold,
-    const int max_iterations) {
+    const int max_iterations,
+    const int mask_dilation) {
   auto output_image = at::zeros_like(input_image);
   auto white = at::ones_like(input_image);
   auto mask = at::zeros_like(input_image);
@@ -324,7 +325,7 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       mask.data_ptr<scalar_t>(),
-      1,
+      mask_dilation,
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
