@@ -91,7 +91,7 @@ __global__ void forward_mask_kernel(
     const int C,
     const int H,
     const int W) {
-    const int dilate_radius = 9;
+    const int dilate_radius = 1;
   CUDA_KERNEL_LOOP(index, total_step) {
     const int b = index / (H * W);
     const int h = (index-b*H*W) / W;
@@ -297,7 +297,7 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       mask.data_ptr<scalar_t>(),
-      2,
+      1,
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
