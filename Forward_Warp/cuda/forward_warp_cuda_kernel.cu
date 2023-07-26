@@ -270,7 +270,9 @@ at::Tensor forward_warp_cuda_forward(
     const at::Tensor input_image,
     const at::Tensor flow,
     const at::Tensor flowback,
-    const GridSamplerInterpolation interpolation_mode) {
+    const GridSamplerInterpolation interpolation_mode,
+    const int inpaint_search_radius,
+    const float inpaint_motion_threshold) {
   auto output_image = at::zeros_like(input_image);
   auto white = at::ones_like(input_image);
   auto mask = at::zeros_like(input_image);
@@ -279,8 +281,6 @@ at::Tensor forward_warp_cuda_forward(
   const int H = input_image.size(2);
   const int W = input_image.size(3);
   const int total_step = B * H * W;
-  const int inpaint_search_radius = 12;
-  const float inpaint_motion_threshold = 5.0;
   AT_DISPATCH_FLOATING_TYPES(input_image.scalar_type(), "forward_warp_forward_cuda", ([&] {
     
     /////// WARP BACKWARDS //////////
