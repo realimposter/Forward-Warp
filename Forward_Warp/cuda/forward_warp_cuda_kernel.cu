@@ -172,8 +172,11 @@ __global__ void dialate_kernel(
     }
 
     if(set_nan) {
-      scalar_t* target_pixel = im1 + get_channel_index(b, c, h, w, C, H, W);
-      *target_pixel = NAN;
+      scalar_t* target_pixel = im1 + get_channel_index(b, 0, h, w, C, H, W);
+      for (int c = 0; c < C; ++c, target_pixel += H*W) {
+          *target_pixel = NAN;
+      }
+
     }
   }
 }
@@ -294,7 +297,7 @@ at::Tensor forward_warp_cuda_forward(
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       mask.data_ptr<scalar_t>(),
-      3,
+      2,
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
