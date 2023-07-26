@@ -108,7 +108,7 @@ __global__ void create_mask_kernel(
         if (new_x >= 0 && new_x < W && new_y >= 0 && new_y < H) {
             scalar_t* mask_p = mask + get_channel_index(b, 0, new_y, new_x, 3, H, W);
             for (int c = 0; c < C; ++c, mask_p += H*W) {
-              *mask_p = 1;
+              *mask_p = 255.0;
             }
         }
     }
