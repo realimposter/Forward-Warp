@@ -106,7 +106,7 @@ __global__ void create_mask_kernel(
         scalar_t* mask_p = mask + get_channel_index(b, 0, h, w, 3, H, W);
 
         for (int c = 0; c < C; ++c, mask_p += H*W) {
-            *mask_p = flow_x*255;
+            *mask_p = flow_x;
         }
 
         // const int new_x = w + flow_x;
@@ -204,7 +204,7 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
-  auto forward_mask = at::ones_like(im0);
+  auto forward_mask = at::zeros_like(im0);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
