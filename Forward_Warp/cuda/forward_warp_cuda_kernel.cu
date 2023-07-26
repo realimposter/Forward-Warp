@@ -220,8 +220,8 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
+    mask = mask.to(at::kBool);
     im2 = at::where(mask, im2, im2.clone().fill_(std::numeric_limits<float>::quiet_NaN()));
-
 
     /////// INPAINT HOLES //////////
     inpaint_nan_pixels_kernel<scalar_t>
