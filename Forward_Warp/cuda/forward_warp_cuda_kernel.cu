@@ -37,13 +37,12 @@ __global__ void forward_warp_cuda_forward_kernel(
     const scalar_t* im0,
     scalar_t* flow,
     scalar_t* im1,
-    scalar_t* white_im1,
     const int B,
     const int C,
     const int H,
     const int W,
     const GridSamplerInterpolation interpolation_mode) {
-    int dilate_radius = 24; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    int dilate_radius = 6; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
@@ -88,16 +87,11 @@ __global__ void forward_warp_cuda_forward_kernel(
                 const scalar_t se_k = (x - x_f) * (y - y_f);
                 const scalar_t* im0_p = im0+get_channel_index(b, 0, h, w, C, H, W);
                 scalar_t* im1_p = im1+get_channel_index(b, 0, y_f, x_f, C, H, W);
-                scalar_t* white_im1_p = white_im1+get_channel_index(b, 0, y_f, x_f, C, H, W); // added warped white image
-                for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W, white_im1_p+=H*W){
+                for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W){
                     atomicAdd(im1_p,     nw_k*(*im0_p));
                     atomicAdd(im1_p+1,   ne_k*(*im0_p));
                     atomicAdd(im1_p+W,   sw_k*(*im0_p));
                     atomicAdd(im1_p+W+1, se_k*(*im0_p));
-                    atomicAdd(white_im1_p,     nw_k); // added warped white image
-                    atomicAdd(white_im1_p+1,   ne_k); // added warped white image
-                    atomicAdd(white_im1_p+W,   sw_k); // added warped white image
-                    atomicAdd(white_im1_p+W+1, se_k); // added warped white image
                 }
             }
         } 
@@ -107,10 +101,8 @@ __global__ void forward_warp_cuda_forward_kernel(
             if (x_nearest >= 0 && x_nearest < W && y_nearest >= 0 && y_nearest < H) {
                 const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
                 scalar_t* im1_p = im1 + get_channel_index(b, 0, y_nearest, x_nearest, C, H, W);
-                scalar_t* white_im1_p = white_im1 + get_channel_index(b, 0, y_nearest, x_nearest, C, H, W); // added warped white image
-                for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W, white_im1_p += H*W) {
+                for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W) {
                     *im1_p = *im0_p;
-                    *white_im1_p = 1; // set pixel value to 1 for the warped white image
                 }
             }
         }
@@ -193,7 +185,7 @@ __global__ void inpaint_nan_pixels_kernel(
 
     __shared__ int nan_count;
 
-    for (int iteration = 0; iteration < 24; ++iteration) {
+    for (int iteration = 0; iteration < 64; ++iteration) {
         nan_count = 0;
         CUDA_KERNEL_LOOP(index, total_step) {
             const int b = index / (H * W);
@@ -266,7 +258,6 @@ at::Tensor forward_warp_cuda_forward(
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
   auto inpainted = at::zeros_like(im0);
-  auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
@@ -281,12 +272,8 @@ at::Tensor forward_warp_cuda_forward(
       im0.data<scalar_t>(),
       flow.data<scalar_t>(),
       im1.data<scalar_t>(),
-      white_im1.data<scalar_t>(), // added warped white image
       B, C, H, W,
       interpolation_mode);
-
-    // Divide warped main image by warped white image
-    im1.div_(white_im1-1);
 
     /////// WARPP BACKWARDS //////////
     back_warp_kernel<scalar_t>
@@ -297,11 +284,11 @@ at::Tensor forward_warp_cuda_forward(
       im2.data_ptr<scalar_t>(),
       B, C, H, W);
 
-    //////// mask im2 by adding im1 NaNs ////////
+    //////// MASK BACK WARP WITH FORWARD WARP HOLES////////
     auto nan_mask = at::isnan(im1);
     im2 = at::where(nan_mask, im1, im2);
 
-    /////// INPAINTING //////////
+    /////// INPAINT HOLES //////////
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
