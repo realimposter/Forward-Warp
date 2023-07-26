@@ -280,7 +280,7 @@ at::Tensor forward_warp_cuda_forward(
   const int W = input_image.size(3);
   const int total_step = B * H * W;
   const int inpaint_search_radius = 12;
-  const scalar_t inpaint_motion_threshold = 5;
+  const float inpaint_motion_threshold = 5.0;
   AT_DISPATCH_FLOATING_TYPES(input_image.scalar_type(), "forward_warp_forward_cuda", ([&] {
     
     /////// WARP BACKWARDS //////////
