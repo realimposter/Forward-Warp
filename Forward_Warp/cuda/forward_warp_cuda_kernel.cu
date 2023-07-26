@@ -81,25 +81,6 @@ __global__ void back_warp_kernel(
     }
 }
 
-
-
-
-
-static __forceinline__ __device__ 
-int get_im_index(
-    const int b,
-    const int c,
-    const int h,
-    const int w,
-    const size_t C,
-    const size_t H,
-    const size_t W) {
-  return b*C*H*W + c*H*W + h*W + w;
-}
-
-
-
-
 template <typename scalar_t>
 __global__ void forward_mask_kernel(
     const int total_step,
@@ -126,8 +107,8 @@ __global__ void forward_mask_kernel(
       const scalar_t ne_k = (x - x_f) * (y_c - y);
       const scalar_t sw_k = (x_c - x) * (y - y_f);
       const scalar_t se_k = (x - x_f) * (y - y_f);
-      const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
-      scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
+      const scalar_t* im0_p = im0+get_channel_index(b, 0, h, w, C, H, W);
+      scalar_t* im1_p = im1+get_channel_index(b, 0, y_f, x_f, C, H, W);
       for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W){
           atomicAdd(im1_p,     nw_k*(*im0_p));
           atomicAdd(im1_p+1,   ne_k*(*im0_p));
@@ -253,14 +234,14 @@ at::Tensor forward_warp_cuda_forward(
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
     output_image = at::where(mask.isnan(), mask, output_image);
 
-    /////// INPAINT HOLES //////////
-    inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      output_image.data_ptr<scalar_t>(),
-      flowback.data_ptr<scalar_t>(),
-      B, C, H, W);
+    // /////// INPAINT HOLES //////////
+    // inpaint_nan_pixels_kernel<scalar_t>
+    // <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+    //   total_step,
+    //   output_image.data_ptr<scalar_t>(),
+    //   flowback.data_ptr<scalar_t>(),
+    //   B, C, H, W);
 
   }));
-  return mask*255;
+  return output_image;
 }
