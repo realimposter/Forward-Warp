@@ -304,12 +304,12 @@ at::Tensor forward_warp_cuda_forward(
     output_image = at::where(isnan(mask), mask, output_image);
 
     /////// INPAINT HOLES //////////
-    inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      output_image.data_ptr<scalar_t>(),
-      flowback.data_ptr<scalar_t>(),
-      B, C, H, W);
+    // inpaint_nan_pixels_kernel<scalar_t>
+    // <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+    //   total_step,
+    //   output_image.data_ptr<scalar_t>(),
+    //   flowback.data_ptr<scalar_t>(),
+    //   B, C, H, W);
 
   }));
   return output_image;
