@@ -218,28 +218,27 @@ __global__ void inpaint_nan_pixels_kernel(
 
 
 at::Tensor forward_warp_cuda_forward(
-    const at::Tensor im0,
+    const at::Tensor input_image,
     const at::Tensor flow,
     const at::Tensor flowback,
     const GridSamplerInterpolation interpolation_mode) {
-  auto im1 = at::zeros_like(im0);
-  auto im2 = at::zeros_like(im0);
-  auto white = at::ones_like(im0);
-  auto mask = at::ones_like(im0);
-  const int B = im0.size(0);
-  const int C = im0.size(1);
-  const int H = im0.size(2);
-  const int W = im0.size(3);
+  auto output_image = at::zeros_like(input_image);
+  auto white = at::ones_like(input_image);
+  auto mask = at::zeros_like(input_image);
+  const int B = input_image.size(0);
+  const int C = input_image.size(1);
+  const int H = input_image.size(2);
+  const int W = input_image.size(3);
   const int total_step = B * H * W;
-  AT_DISPATCH_FLOATING_TYPES(im0.scalar_type(), "forward_warp_forward_cuda", ([&] {
+  AT_DISPATCH_FLOATING_TYPES(input_image.scalar_type(), "forward_warp_forward_cuda", ([&] {
     
-    /////// WARPP BACKWARDS //////////
+    /////// WARP BACKWARDS //////////
     back_warp_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      im0.data_ptr<scalar_t>(),
+      input_image.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
-      im2.data_ptr<scalar_t>(),
+      output_image.data_ptr<scalar_t>(),
       B, C, H, W);
 
     /////// CREATE MASK FROM FORWARD WARP HOLES //////////
@@ -252,17 +251,16 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    // where mask image is nane, replace with mask image else uuse im2 using at::where
-    im2 = at::where(mask.isnan(), mask, im2);
+    output_image = at::where(mask.isnan(), mask, output_image);
 
     /////// INPAINT HOLES //////////
     inpaint_nan_pixels_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      im2.data_ptr<scalar_t>(),
+      output_image.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
       B, C, H, W);
 
   }));
-  return im2;
+  return mask*255;
 }
