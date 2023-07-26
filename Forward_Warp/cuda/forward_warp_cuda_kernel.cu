@@ -212,7 +212,7 @@ __global__ void inpaint_nan_pixels_kernel(
             if (!isnan(*im0_p)) continue;
 
             // since pixel is NaN, increment nan_count
-            atomicAdd(&nan_count, 1);
+            nan_count++;
 
             // foreach pixel in a radius of "radius" around the current pixel index
             bool found = false;
@@ -222,6 +222,9 @@ __global__ void inpaint_nan_pixels_kernel(
                     // get neighbor index
                     const int neighbor_index = get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
 
+                    // if neighbor pixel is Nan, move on to the next neighbor
+                    if (isnan(*(im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W)))) continue;
+
                     // get neighbor flow
                     const int neighbor_flow_index = get_channel_index(b, 0, neighbor_h, neighbor_w, 2, H, W);
                     const scalar_t x2 = (scalar_t)w + flow[neighbor_flow_index*2+0];
@@ -230,11 +233,13 @@ __global__ void inpaint_nan_pixels_kernel(
                     // compare neighbor flow to current pixel flow
                     const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
 
-                    // if the flows are different, move on to the next neighbor
-                    // if (flowDiff > 0.5) continue;
+                    // if the flows are different, move on to the next neighbor. disable this while testing
+                    if (flowDiff > 50) continue;
 
                     // else copy the neighbor pixel value to the current pixel
-                    scalar_t* im1_p = im1+get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
+                    for (int c = 0; c < C; ++c) {
+                        im1[index + c * (H * W)] = im0[neighbor_index + c * (H * W)];
+                    }
 
                     // end both of the loops
                     found = true;
