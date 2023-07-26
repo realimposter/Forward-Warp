@@ -81,37 +81,62 @@ __global__ void back_warp_kernel(
     }
 }
 
+
+
+
+
+static __forceinline__ __device__ 
+int get_im_index(
+    const int b,
+    const int c,
+    const int h,
+    const int w,
+    const size_t C,
+    const size_t H,
+    const size_t W) {
+  return b*C*H*W + c*H*W + h*W + w;
+}
+
+
+
+
 template <typename scalar_t>
-__global__ void create_mask_kernel(
+__global__ void forward_mask_kernel(
     const int total_step,
-    scalar_t* mask,
+    const scalar_t* im0,
     const scalar_t* flow,
+    scalar_t* im1,
     const int B,
     const int C,
     const int H,
     const int W) {
 
-    // Create mask from the optical flow holes
-    CUDA_KERNEL_LOOP(index, total_step) {
-        const int b = index / (H * W);
-        const int h = (index-b*H*W) / W;
-        const int w = index % W;
-
-
-        const scalar_t flow_x = (scalar_t)w + flow[index * 2 + 0];
-        const scalar_t flow_y = (scalar_t)h + flow[index * 2 + 1];
-
-        const int new_x = w + flow_x;
-        const int new_y = h + flow_y;
-
-        // Check if the new position is inside the image set the mask to 1
-        if (new_x >= 0 && new_x < W && new_y >= 0 && new_y < H) {
-            scalar_t* mask_p = mask + get_channel_index(b, 0, new_y, new_x, 3, H, W);
-            for (int c = 0; c < C; ++c, mask_p += H*W) {
-              *mask_p = 255.0;
-            }
-        }
+  CUDA_KERNEL_LOOP(index, total_step) {
+    const int b = index / (H * W);
+    const int h = (index-b*H*W) / W;
+    const int w = index % W;
+    const scalar_t x = (scalar_t)w + flow[index*2+0];
+    const scalar_t y = (scalar_t)h + flow[index*2+1];
+    const int x_f = static_cast<int>(::floor(x));
+    const int y_f = static_cast<int>(::floor(y));
+    const int x_c = x_f + 1;
+    const int y_c = y_f + 1;
+    if(x_f>=0 && x_c<W && y_f>=0 && y_c<H){
+      const scalar_t nw_k = (x_c - x) * (y_c - y);
+      const scalar_t ne_k = (x - x_f) * (y_c - y);
+      const scalar_t sw_k = (x_c - x) * (y - y_f);
+      const scalar_t se_k = (x - x_f) * (y - y_f);
+      const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
+      scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
+      for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W){
+          atomicAdd(im1_p,     nw_k*(*im0_p));
+          atomicAdd(im1_p+1,   ne_k*(*im0_p));
+          atomicAdd(im1_p+W,   sw_k*(*im0_p));
+          atomicAdd(im1_p+W+1, se_k*(*im0_p));
+      }
     }
+  }
+
 }
 
 template <typename scalar_t>
@@ -199,7 +224,8 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
-  auto forward_mask = at::zeros_like(im0);
+  auto white = at::ones_like(im0);
+  auto mask = at::ones_like(im0);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
@@ -217,26 +243,25 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     /////// CREATE MASK FROM FORWARD WARP HOLES //////////
-    create_mask_kernel<scalar_t>
+    forward_mask_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
-      forward_mask.data_ptr<scalar_t>(),
+      white.data_ptr<scalar_t>(),
       flow.data_ptr<scalar_t>(),
+      mask.data_ptr<scalar_t>(),
       B, C, H, W);
 
-    // //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    // // Create a tensor of the same size as `im2`, filled with NaN
-    // auto nan_tensor = im2.clone().fill_(std::numeric_limits<float>::quiet_NaN());
-    // auto mask = at::eq(forward_mask, 0.0);
-    // im2 = at::where(mask, im2, nan_tensor);
+    //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
+    // where mask image is nane, replace with mask image else uuse im2 using at::where
+    im2 = at::where(mask.isnan(), mask, im2);
 
-    // /////// INPAINT HOLES //////////
-    // inpaint_nan_pixels_kernel<scalar_t>
-    // <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-    //   total_step,
-    //   im2.data_ptr<scalar_t>(),
-    //   flowback.data_ptr<scalar_t>(),
-    //   B, C, H, W);
+    /////// INPAINT HOLES //////////
+    inpaint_nan_pixels_kernel<scalar_t>
+    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+      total_step,
+      im2.data_ptr<scalar_t>(),
+      flowback.data_ptr<scalar_t>(),
+      B, C, H, W);
 
   }));
   return forward_mask;
