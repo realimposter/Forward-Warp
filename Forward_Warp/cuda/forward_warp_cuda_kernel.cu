@@ -222,8 +222,7 @@ at::Tensor forward_warp_cuda_forward(
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
     // Create a tensor of the same size as `im2`, filled with NaN
     auto nan_tensor = im2.clone().fill_(std::numeric_limits<float>::quiet_NaN());
-    // create mask where forward_mask value is 1.0
-    auto mask = at::eq(forward_mask, 1.0);
+    auto mask = at::eq(forward_mask, 0.0);
     im2 = at::where(mask, im2, nan_tensor);
 
     /////// INPAINT HOLES //////////
