@@ -219,6 +219,12 @@ at::Tensor forward_warp_cuda_forward(
       flow.data_ptr<scalar_t>(),
       B, C, H, W);
 
+    // return mask as rgb image 0-255
+    mask *= 255;
+    // convert mask to 3 channels
+    mask = mask.repeat({1,3,1,1});
+    return mask;
+
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
     mask = mask.to(at::kBool);
     im2 = at::where(mask, im2.clone().fill_(std::numeric_limits<float>::quiet_NaN()),im2);
