@@ -103,9 +103,11 @@ __global__ void create_mask_kernel(
 
         const int pixel_index = get_channel_index(b, 0, h, w, 1, H, W);
 
-        mask[get_channel_index(b, 0, h, w, 3, H, W)] = flow_x*255;
-        mask[get_channel_index(b, 1, h, w, 3, H, W)] = flow_x*255;
-        mask[get_channel_index(b, 2, h, w, 3, H, W)] = flow_x*255;
+        scalar_t* mask_p = mask + get_channel_index(b, 0, h, w, 3, H, W);
+
+        for (int c = 0; c < C; ++c, mask_p += H*W) {
+            *mask_p = flow_x*255;
+        }
 
         // const int new_x = w + flow_x;
         // const int new_y = h + flow_y;
