@@ -103,13 +103,15 @@ __global__ void create_mask_kernel(
 
         const int pixel_index = get_channel_index(b, 0, h, w, 1, H, W);
 
-        const int new_x = w + flow_x;
-        const int new_y = h + flow_y;
+        mask[pixel_index] = flow_x;
 
-        // Check if the new position is inside the image set the mask to 1
-        if (new_x >= 0 && new_x < W && new_y >= 0 && new_y < H) {
-            mask[get_channel_index(b, 0, new_y, new_x, 1, H, W)] = 1;
-        }
+        // const int new_x = w + flow_x;
+        // const int new_y = h + flow_y;
+
+        // // Check if the new position is inside the image set the mask to 1
+        // if (new_x >= 0 && new_x < W && new_y >= 0 && new_y < H) {
+        //     mask[get_channel_index(b, 0, new_y, new_x, 1, H, W)] = 1;
+        // }
     }
 }
 
