@@ -182,51 +182,75 @@ __global__ void back_warp_kernel(
 
 template <typename scalar_t>
 __global__ void inpaint_nan_pixels_kernel(
-    scalar_t* im1,
-    const scalar_t* flowback,
+    const int total_step,
+    scalar_t* im0,
+    const scalar_t* flow,
     const int B,
     const int C,
     const int H,
     const int W) {
-    const int total_step = H * W;
-    __shared__ int nan_count;
+    const int radius = 4;  
 
-    const scalar_t flow_threshold = 1e-2;  // threshold for similar flow
+    __shared__ int nan_count;
 
     for (int iteration = 0; iteration < 24; ++iteration) {
         nan_count = 0;
-
         CUDA_KERNEL_LOOP(index, total_step) {
             const int b = index / (H * W);
-            const int pixel_x = (index - b * H * W) / W;
-            const int pixel_y = index % W;
+            const int h = (index-b*H*W) / W;
+            const int w = index % W;
 
-            // if this pixel is NaN, we inpaint it
-            if (isnan(im1[get_channel_index(b, 0, pixel_x, pixel_y, C, H, W)])) {
-                atomicAdd(&nan_count, 1);
+            // get flow vector
+            const scalar_t x1 = (scalar_t)w + flow[index*2+0];
+            const scalar_t y1 = (scalar_t)h + flow[index*2+1];
 
-                // iterate over all neighbors in a 3x3 window
-                for (int i = max(0, pixel_x - 1); i <= min(H - 1, pixel_x + 1); ++i) {
-                    for (int j = max(0, pixel_y - 1); j <= min(W - 1, pixel_y + 1); ++j) {
-                        scalar_t neighbor_flow = flowback[get_pixel_index(b, i, j, H, W)];
-                        scalar_t current_flow = flowback[get_pixel_index(b, pixel_x, pixel_y, H, W)];
+            // get current pixel
+            const scalar_t* im0_p = im0+get_channel_index(b, 0, h, w, C, H, W);
 
-                        // if the neighbor is not NaN and its flow is similar to the current pixel
-                        if (!isnan(im1[get_channel_index(b, 0, i, j, C, H, W)]) &&
-                            fabs(neighbor_flow - current_flow) < flow_threshold) {
-                            // inpaint the current pixel with the value of the neighbor
-                            for (int c = 0; c < C; ++c) {
-                                im1[get_channel_index(b, c, pixel_x, pixel_y, C, H, W)] =
-                                    im1[get_channel_index(b, c, i, j, C, H, W)];
-                            }
-                            break;
-                        }
+            // make sure pixel is not NaN, if it is end the loop
+            if (!isnan(*im0_p)) continue;
+
+            // since pixel is NaN, increment nan_count
+            nan_count++;
+
+            // foreach pixel in a radius of "radius" around the current pixel index
+            bool found = false;
+            for (int neighbor_w = max(0, w - radius); neighbor_w <= min(W - 1, w + radius); ++neighbor_w) {
+                if (found) break;
+                for (int neighbor_h = max(0, h - radius); neighbor_h <= min(H - 1, h + radius); ++neighbor_h) {
+                    // get neighbor index
+                    const int neighbor_index = get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
+
+                    // if neighbor pixel is Nan, move on to the next neighbor
+                    // if (isnan(*(im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W)))) continue;
+
+                    // get neighbor flow
+                    const int neighbor_flow_index = get_channel_index(b, 0, neighbor_h, neighbor_w, 2, H, W);
+                    const scalar_t x2 = (scalar_t)w + flow[neighbor_flow_index*2+0];
+                    const scalar_t y2 = (scalar_t)h + flow[neighbor_flow_index*2+1];
+
+                    // compare neighbor flow to current pixel flow
+                    const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
+
+                    // if the flows are different, move on to the next neighbor. disable this while testing
+                    // if (flowDiff > 50) continue;
+
+                    // else copy the neighbor pixel value to the current pixel
+                    scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
+                    scalar_t* im1_p = im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
+                    for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W) {
+                        *im0_p = *im1_p;
                     }
+
+                    // end both of the loops
+                    found = true;
+                    break;
                 }
+                if(found) break;
             }
         }
 
-        __syncthreads();  // Synchronize threads before starting the next iteration
+        __syncthreads();  
 
         // Break out of the loop if no NaN pixels are found
         if (nan_count == 0) break;
@@ -241,13 +265,13 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
+  auto inpainted = at::zeros_like(im0);
   auto white_im1 = at::ones_like(im0); // create an all-white image of same size as im0
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
   const int W = im0.size(3);
   const int total_step = B * H * W;
-  const int total_pixels = H * W;
   AT_DISPATCH_FLOATING_TYPES(im0.scalar_type(), "forward_warp_forward_cuda", ([&] {
 
     /////////// FORWARD WARP ////////////
@@ -279,7 +303,8 @@ at::Tensor forward_warp_cuda_forward(
 
     /////// INPAINTING //////////
     inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_pixels), CUDA_NUM_THREADS>>>(
+    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+      total_step,
       im2.data_ptr<scalar_t>(),
       flowback.data_ptr<scalar_t>(),
       B, C, H, W);
