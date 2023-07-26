@@ -85,13 +85,13 @@ template <typename scalar_t>
 __global__ void forward_mask_kernel(
     const int total_step,
     const scalar_t* im0,
-    const scalar_t* flow,
+    scalar_t* flow,
     scalar_t* im1,
     const int B,
     const int C,
     const int H,
     const int W) {
-    const int dilate_radius = 9;
+    const int dilate_radius = 3;
   CUDA_KERNEL_LOOP(index, total_step) {
     const int b = index / (H * W);
     const int h = (index-b*H*W) / W;
