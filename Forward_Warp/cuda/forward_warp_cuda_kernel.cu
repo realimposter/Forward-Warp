@@ -209,8 +209,15 @@ __global__ void inpaint_nan_pixels_kernel(
             // get current pixel
             const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
 
-            // make sure pixel is not NaN, if it is end the loop
-            if (!isnan(*im0_p)) continue;
+            // make sure pixel is not NaN, if it is move to next loop
+            bool nan_detected = false;
+            for (int c = 0; c < C; ++c, im0_p += H*W) {
+                if (isnan(*im0_p)) {
+                    nan_detected = true;
+                    break;
+                }
+            }
+            if(nan_detected) continue;
 
             // since pixel is NaN, increment nan_count
             nan_count++;
