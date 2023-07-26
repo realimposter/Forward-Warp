@@ -206,7 +206,6 @@ at::Tensor forward_warp_cuda_forward(
   auto output_image = at::zeros_like(input_image);
   auto white = at::ones_like(input_image);
   auto mask = at::zeros_like(input_image);
-  auto mask = at::full_like(output_image, NAN);
   const int B = input_image.size(0);
   const int C = input_image.size(1);
   const int H = input_image.size(2);
