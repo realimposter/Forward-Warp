@@ -237,8 +237,10 @@ __global__ void inpaint_nan_pixels_kernel(
                     if (flowDiff > 50) continue;
 
                     // else copy the neighbor pixel value to the current pixel
-                    for (int c = 0; c < C; ++c) {
-                        im1[index + c * (H * W)] = im0[neighbor_index + c * (H * W)];
+                    const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
+                    scalar_t* im1_p = im1 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
+                    for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W) {
+                        *im1_p = *im0_p;
                     }
 
                     // end both of the loops
