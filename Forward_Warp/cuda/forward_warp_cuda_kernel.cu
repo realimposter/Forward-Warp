@@ -108,8 +108,7 @@ __global__ void create_mask_kernel(
 
         // Check if the new position is inside the image set the mask to 1
         if (new_x >= 0 && new_x < W && new_y >= 0 && new_y < H) {
-            static int new_pixel_index = get_channel_index(b, 0, new_y, new_x, 1, H, W);
-            mask[new_pixel_index] = 1;
+            mask[get_channel_index(b, 0, new_y, new_x, 1, H, W)] = 1;
         }
     }
 }
