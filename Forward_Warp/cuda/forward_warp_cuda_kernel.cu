@@ -223,7 +223,7 @@ __global__ void inpaint_nan_pixels_kernel(
                     const int neighbor_index = get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
 
                     // if neighbor pixel is Nan, move on to the next neighbor
-                    if (isnan(*(im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W)))) continue;
+                    // if (isnan(*(im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W)))) continue;
 
                     // get neighbor flow
                     const int neighbor_flow_index = get_channel_index(b, 0, neighbor_h, neighbor_w, 2, H, W);
@@ -234,7 +234,7 @@ __global__ void inpaint_nan_pixels_kernel(
                     const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
 
                     // if the flows are different, move on to the next neighbor. disable this while testing
-                    if (flowDiff > 50) continue;
+                    // if (flowDiff > 50) continue;
 
                     // else copy the neighbor pixel value to the current pixel
                     const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
