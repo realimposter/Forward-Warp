@@ -144,6 +144,7 @@ __global__ void forward_mask_kernel(
   }
 }
 
+template <typename scalar_t>
 __global__ void dialate_kernel(
     const int total_step,
     scalar_t* im1,
