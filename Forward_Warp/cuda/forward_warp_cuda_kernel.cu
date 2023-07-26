@@ -205,6 +205,7 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto output_image = at::zeros_like(input_image);
   auto white = at::ones_like(input_image);
+  auto mask = at::zeros_like(input_image);
   auto mask = at::full_like(output_image, NAN);
   const int B = input_image.size(0);
   const int C = input_image.size(1);
@@ -232,7 +233,8 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    output_image = at::where(isnan(mask), mask, output_image);
+    auto nan_tensor = at::full_like(output_image, NAN);
+    output_image = at::where(mask == 0, nan_tensor, output_image);
 
     /////// INPAINT HOLES //////////
     inpaint_nan_pixels_kernel<scalar_t>
