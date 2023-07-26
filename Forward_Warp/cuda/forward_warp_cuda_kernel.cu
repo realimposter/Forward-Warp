@@ -289,7 +289,7 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     /////// DIALATE MASK //////////
-    forward_mask_kernel<scalar_t>
+    dialate_kernel<scalar_t>
     <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
       total_step,
       mask.data_ptr<scalar_t>(),
