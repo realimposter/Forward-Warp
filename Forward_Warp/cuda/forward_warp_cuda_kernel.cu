@@ -206,7 +206,7 @@ __global__ void inpaint_nan_pixels_kernel(
             const scalar_t y1 = (scalar_t)h + flow[index*2+1];
 
             // get current pixel
-            const scalar_t* im0_p = im0+get_channel_index(b, 0, h, w, C, H, W);
+            const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
 
             // make sure pixel is not NaN, if it is end the loop
             if (!isnan(*im0_p)) continue;
@@ -215,15 +215,15 @@ __global__ void inpaint_nan_pixels_kernel(
             nan_count++;
 
             // foreach pixel in a radius of "radius" around the current pixel index
-            bool found = false;
+            int neighbor_count = 0;
+            scalar_t sum[C] = {0}; // Initialize array with zeros
             for (int neighbor_w = max(0, w - radius); neighbor_w <= min(W - 1, w + radius); ++neighbor_w) {
-                if (found) break;
                 for (int neighbor_h = max(0, h - radius); neighbor_h <= min(H - 1, h + radius); ++neighbor_h) {
                     // get neighbor index
                     const int neighbor_index = get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
 
                     // if neighbor pixel is Nan, move on to the next neighbor
-                    if (isnan(*(im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W)))) continue;
+                    if (isnan(*(im0 + neighbor_index))) continue;
 
                     // get neighbor flow
                     const int neighbor_flow_index = get_channel_index(b, 0, neighbor_h, neighbor_w, 2, H, W);
@@ -233,21 +233,26 @@ __global__ void inpaint_nan_pixels_kernel(
                     // compare neighbor flow to current pixel flow
                     const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
 
-                    // if the flows are different, move on to the next neighbor. disable this while testing
+                    // if the flows are different, move on to the next neighbor.
                     if (flowDiff > 0.01) continue;
 
-                    // else copy the neighbor pixel value to the current pixel
-                    scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
-                    scalar_t* im1_p = im0 + get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
-                    for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W) {
-                        *im0_p = *im1_p;
+                    // add the neighbor pixel value to the sum
+                    scalar_t* im1_p = im0 + neighbor_index;
+                    for (int c = 0; c < C; ++c, im1_p += H*W) {
+                        sum[c] += *im1_p;
                     }
 
-                    // end both of the loops
-                    found = true;
-                    break;
+                    // increment the count of valid neighbors
+                    neighbor_count++;
                 }
-                if(found) break;
+            }
+
+            // if any valid neighbors were found, average their values and use that to replace the current pixel
+            if (neighbor_count > 0) {
+                scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
+                for (int c = 0; c < C; ++c, im0_p += H*W) {
+                    *im0_p = sum[c] / neighbor_count;
+                }
             }
         }
 
@@ -257,6 +262,7 @@ __global__ void inpaint_nan_pixels_kernel(
         if (nan_count == 0) break;
     }
 }
+
 
 
 at::Tensor forward_warp_cuda_forward(
