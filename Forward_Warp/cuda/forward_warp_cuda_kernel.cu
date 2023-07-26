@@ -231,8 +231,19 @@ __global__ void inpaint_nan_pixels_kernel(
                     const int neighbor_index = get_channel_index(b, 0, neighbor_h, neighbor_w, C, H, W);
 
                     // // if neighbor pixel is Nan, move on to the next neighbor
-                    if (isnan(*(im0 + neighbor_index))) continue;
+                    // if (isnan(*(im0 + neighbor_index))) continue;
 
+                    // get current pixel
+                    const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
+                    // make sure pixel is not NaN, if it is move to next loop
+                    bool neighbor_nan_detected = false;
+                    for (int c = 0; c < C; ++c, im0_p += H*W) {
+                        if (!isnan(*im0_p)) {
+                            neighbor_nan_detected = true;
+                            break;
+                        }
+                    }
+                    if(neighbor_nan_detected) continue;
 
                     // get neighbor flow
                     const int neighbor_flow_index = get_channel_index(b, 0, neighbor_h, neighbor_w, 2, H, W);
