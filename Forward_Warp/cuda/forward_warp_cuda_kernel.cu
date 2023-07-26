@@ -189,73 +189,50 @@ __global__ void inpaint_nan_pixels_kernel(
     const int H,
     const int W) {
     const int total_step = H * W;
-    const int radius = 4;  // Add this line to define radius
-
     __shared__ int nan_count;
+
+    const scalar_t flow_threshold = 1e-2;  // threshold for similar flow
 
     for (int iteration = 0; iteration < 24; ++iteration) {
         nan_count = 0;
-        CUDA_KERNEL_LOOP(index, total_step) {
 
-            nan_count += 1;
+        CUDA_KERNEL_LOOP(index, total_step) {
             const int b = index / (H * W);
             const int pixel_x = (index - b * H * W) / W;
             const int pixel_y = index % W;
 
-            int red = get_channel_index(b, 0, pixel_y, pixel_x, C, H, W);
-            int green = get_channel_index(b, 1, pixel_y, pixel_x, C, H, W);
-            int blue = get_channel_index(b, 2, pixel_y, pixel_x, C, H, W);
+            // if this pixel is NaN, we inpaint it
+            if (isnan(im1[get_channel_index(b, 0, pixel_x, pixel_y, C, H, W)])) {
+                atomicAdd(&nan_count, 1);
 
-            // make sure at least one of the pixels is NaN before infilling
-            if (!isnan(im1[red]) && !isnan(im1[green]) && !isnan(im1[blue])) continue;
+                // iterate over all neighbors in a 3x3 window
+                for (int i = max(0, pixel_x - 1); i <= min(H - 1, pixel_x + 1); ++i) {
+                    for (int j = max(0, pixel_y - 1); j <= min(W - 1, pixel_y + 1); ++j) {
+                        scalar_t neighbor_flow = flowback[get_pixel_index(b, i, j, H, W)];
+                        scalar_t current_flow = flowback[get_pixel_index(b, pixel_x, pixel_y, H, W)];
 
-            const scalar_t flow_x = flowback[index*2+0];
-            const scalar_t flow_y = flowback[index*2+1];
-
-            // foreach pixel in a radious of "radius" arounnd index
-            for (int neighbor_x = max(0, pixel_x - radius); neighbor_x <= min(H - 1, pixel_x + radius); ++neighbor_x) {
-                for (int neighbor_y = max(0, pixel_y - radius); neighbor_y <= min(W - 1, pixel_y + radius); ++neighbor_y) {
-                    // foreach neighborig pixel
-                    const int neighbor_index = get_pixel_index(b, neighbor_y, neighbor_x, H, W);
-                    const int neighbor_red = get_channel_index(b, 0, neighbor_y, neighbor_x, C, H, W);
-                    const int neighbor_green = get_channel_index(b, 1, neighbor_y, neighbor_x, C, H, W);
-                    const int neighbor_blue = get_channel_index(b, 2, neighbor_y, neighbor_x, C, H, W);
-
-                    im1[red] = im1[neighbor_red];
-                    im1[green] = im1[neighbor_green];
-                    im1[blue] = im1[neighbor_blue];
-                    
-                    // move on to next kernel loop NaN pixel
-                    goto next_pixel;
-
-
-                    // // if rgb pixel is NaN skip to next neighboring pixel
-                    // if (isnan(im1[neighbor_index*C]) && isnan(im1[(neighbor_index*C)+1]) && isnan(im1[(neighbor_index*C)+1])) continue;
-
-                    // //calculate difference in flow vectors
-                    // const scalar_t flow_x2 = flowback[neighbor_index*2+0];
-                    // const scalar_t flow_y2 = flowback[neighbor_index*2+1];
-                    // scalar_t flowback_diff = abs(flow_x - flow_x2) + abs(flow_y - flow_y2);
-
-                    // // if difference in flow is low, copy the pixel color, and move to next pixel
-                    // if (flowback_diff < 100) {
-                    //     im1[red] = im1[(neighbor_index*C)+0];
-                    //     im1[green] = im1[(neighbor_index*C)+1];
-                    //     im1[blue] = im1[(neighbor_index*C)+2];
-                    //     // move on to next kernel loop NaN pixel
-                    //     goto next_pixel;
-                    // }
+                        // if the neighbor is not NaN and its flow is similar to the current pixel
+                        if (!isnan(im1[get_channel_index(b, 0, i, j, C, H, W)]) &&
+                            fabs(neighbor_flow - current_flow) < flow_threshold) {
+                            // inpaint the current pixel with the value of the neighbor
+                            for (int c = 0; c < C; ++c) {
+                                im1[get_channel_index(b, c, pixel_x, pixel_y, C, H, W)] =
+                                    im1[get_channel_index(b, c, i, j, C, H, W)];
+                            }
+                            break;
+                        }
+                    }
                 }
             }
-            next_pixel:;
         }
 
-        __syncthreads();  // Add this line to synchronize threads before starting the next iteration
+        __syncthreads();  // Synchronize threads before starting the next iteration
 
         // Break out of the loop if no NaN pixels are found
         if (nan_count == 0) break;
     }
 }
+
 
 at::Tensor forward_warp_cuda_forward(
     const at::Tensor im0,
