@@ -4,7 +4,7 @@ from torch.autograd import Function
 
 class Forward_Warp_Python:
     @staticmethod
-    def forward(im0, flow, interpolation_mode):
+    def forward(im0, flow, interpolation_mode,inpaint_search_radius, inpaint_motion_threshold):
         im1 = torch.zeros_like(im0)
         B = im0.shape[0]
         H = im0.shape[2]
