@@ -91,7 +91,7 @@ __global__ void forward_mask_kernel(
     const int C,
     const int H,
     const int W) {
-    const int dilate_radius = 3;
+    const int dilate_radius = 9;
   CUDA_KERNEL_LOOP(index, total_step) {
     const int b = index / (H * W);
     const int h = (index-b*H*W) / W;
@@ -262,13 +262,13 @@ at::Tensor forward_warp_cuda_forward(
     auto nan_tensor = at::full_like(output_image, NAN);
     output_image = at::where(mask == 0, nan_tensor, output_image);
 
-    /////// INPAINT HOLES //////////
-    inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      output_image.data_ptr<scalar_t>(),
-      flowback.data_ptr<scalar_t>(),
-      B, C, H, W);
+    // /////// INPAINT HOLES //////////
+    // inpaint_nan_pixels_kernel<scalar_t>
+    // <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+    //   total_step,
+    //   output_image.data_ptr<scalar_t>(),
+    //   flowback.data_ptr<scalar_t>(),
+    //   B, C, H, W);
 
   }));
   return output_image;
