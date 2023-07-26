@@ -94,16 +94,22 @@ __global__ void create_mask_kernel(
     // Create mask from the optical flow holes
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
-        const int h = (index - b * H * W) / W;
+        const int h = (index-b*H*W) / W;
         const int w = index % W;
 
-        const scalar_t x = (scalar_t)w + flow[index * 2 + 0];
-        const scalar_t y = (scalar_t)h + flow[index * 2 + 1];
 
-        // Check if the new position is within the image boundaries
-        if (x >= 0 && x < W && y >= 0 && y < H) {
-            const int new_index = b * H * W + (int)y * W + (int)x;
-            mask[new_index] = 1.0;
+        const scalar_t flow_x = (scalar_t)w + flow[index * 2 + 0];
+        const scalar_t flow_y = (scalar_t)h + flow[index * 2 + 1];
+
+        const int pixel_index = get_channel_index(b, 0, h, w, 1, H, W);
+
+        const int new_x = w + flow_x;
+        const int new_y = h + flow_y;
+
+        // Check if the new position is inside the image set the mask to 1
+        if (new_x >= 0 && new_x < W && new_y >= 0 && new_y < H) {
+            static int new_pixel_index = get_channel_index(b, 0, new_y, new_x, 1, H, W);
+            mask[new_pixel_index] = 1;
         }
     }
 }
@@ -209,7 +215,6 @@ at::Tensor forward_warp_cuda_forward(
       flowback.data_ptr<scalar_t>(),
       im2.data_ptr<scalar_t>(),
       B, C, H, W);
-
 
     /////// CREATE MASK FROM FORWARD WARP HOLES //////////
     create_mask_kernel<scalar_t>
