@@ -232,7 +232,7 @@ at::Tensor forward_warp_cuda_forward(
       B, C, H, W);
 
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    output_image = at::where(mask.isnan(), mask, output_image);
+    output_image.masked_fill_(mask.isnan(), mask);
 
     // /////// INPAINT HOLES //////////
     // inpaint_nan_pixels_kernel<scalar_t>
