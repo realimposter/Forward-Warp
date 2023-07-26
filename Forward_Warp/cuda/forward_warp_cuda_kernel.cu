@@ -216,7 +216,7 @@ __global__ void inpaint_nan_pixels_kernel(
 
             // foreach pixel in a radius of "radius" around the current pixel index
             int neighbor_count = 0;
-            scalar_t sum[C] = {0}; // Initialize array with zeros
+            scalar_t sum[3] = {0}; // Initialize array with zeros
             for (int neighbor_w = max(0, w - radius); neighbor_w <= min(W - 1, w + radius); ++neighbor_w) {
                 for (int neighbor_h = max(0, h - radius); neighbor_h <= min(H - 1, h + radius); ++neighbor_h) {
                     // get neighbor index
