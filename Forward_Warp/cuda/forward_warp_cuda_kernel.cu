@@ -238,7 +238,7 @@ __global__ void inpaint_nan_pixels_kernel(
                     // make sure pixel is not NaN, if it is move to next loop
                     bool neighbor_nan_detected = false;
                     for (int c = 0; c < C; ++c, im0_p += H*W) {
-                        if (!isnan(*im0_p)) {
+                        if (isnan(*im0_p)) {
                             neighbor_nan_detected = true;
                             break;
                         }
