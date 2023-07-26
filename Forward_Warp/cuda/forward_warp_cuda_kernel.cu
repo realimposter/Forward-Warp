@@ -85,7 +85,7 @@ template <typename scalar_t>
 __global__ void create_mask_kernel(
     const int total_step,
     scalar_t* flow,
-    scalar_t* mask,
+    bool* mask,
     const int B,
     const int C,
     const int H,
@@ -103,7 +103,7 @@ __global__ void create_mask_kernel(
         // Check if the new position is within the image boundaries
         if (x >= 0 && x < W && y >= 0 && y < H) {
             const int new_index = b * H * W + (int)y * W + (int)x;
-            mask[new_index] = 1.0;
+            mask[new_index] = true;
         }
     }
 }
@@ -193,7 +193,7 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
-  auto mask = at::zeros_like(im0);
+  auto mask = at::zeros_like(im0).to(torch::kBool);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
@@ -219,15 +219,10 @@ at::Tensor forward_warp_cuda_forward(
       flow.data_ptr<scalar_t>(),
       B, C, H, W);
 
-    // return mask as rgb image 0-255
-    mask *= 255;
-    // convert mask to 3 channels
-    mask = mask.repeat({1,3,1,1});
-    return mask;
-
     //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    mask = mask.to(at::kBool);
-    im2 = at::where(mask, im2.clone().fill_(std::numeric_limits<float>::quiet_NaN()),im2);
+    // Create a tensor of the same size as `im2`, filled with NaN
+    auto nan_tensor = im2.clone().fill_(std::numeric_limits<float>::quiet_NaN());
+    im2 = at::where(mask, im2, nan_tensor);
 
     /////// INPAINT HOLES //////////
     inpaint_nan_pixels_kernel<scalar_t>
