@@ -85,7 +85,7 @@ template <typename scalar_t>
 __global__ void create_mask_kernel(
     const int total_step,
     scalar_t* flow,
-    bool* mask,
+    scalar_t* mask,
     const int B,
     const int C,
     const int H,
@@ -103,7 +103,7 @@ __global__ void create_mask_kernel(
         // Check if the new position is within the image boundaries
         if (x >= 0 && x < W && y >= 0 && y < H) {
             const int new_index = b * H * W + (int)y * W + (int)x;
-            mask[new_index] = true;
+            mask[new_index] = 1.0;
         }
     }
 }
@@ -193,7 +193,7 @@ at::Tensor forward_warp_cuda_forward(
     const GridSamplerInterpolation interpolation_mode) {
   auto im1 = at::zeros_like(im0);
   auto im2 = at::zeros_like(im0);
-  auto mask = at::zeros_like(im0).to(torch::kBool);
+  auto mask = at::zeros_like(im0);
   const int B = im0.size(0);
   const int C = im0.size(1);
   const int H = im0.size(2);
