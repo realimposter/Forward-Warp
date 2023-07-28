@@ -243,16 +243,19 @@ __global__ void inpaint_nan_pixels_kernel(
                     }
                     if(neighbor_nan_detected) continue;
 
-                    // get neighbor flow
-                    const int neighbor_flow_index = get_channel_index(b, 0, neighbor_h, neighbor_w, 2, H, W);
-                    const scalar_t x2 = (scalar_t)w + flow[neighbor_flow_index*2+0];
-                    const scalar_t y2 = (scalar_t)h + flow[neighbor_flow_index*2+1];
+                    // on the last 10 iterations infill with te average pixel
+                    if (iteration < max_iterations - 10){
+                      // get neighbor flow
+                      const int neighbor_flow_index = get_channel_index(b, 0, neighbor_h, neighbor_w, 2, H, W);
+                      const scalar_t x2 = (scalar_t)w + flow[neighbor_flow_index*2+0];
+                      const scalar_t y2 = (scalar_t)h + flow[neighbor_flow_index*2+1];
 
-                    // compare neighbor flow to current pixel flow
-                    const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
+                      // compare neighbor flow to current pixel flow
+                      const scalar_t flowDiff = abs(x1 - x2) + abs(y1 - y2);
 
-                    // if the flows are different, move on to the next neighbor.
-                    if (flowDiff > motion_threshold) continue;
+                      // if the flows are different, move on to the next neighbor.
+                      if (flowDiff > motion_threshold) continue;
+                    }
 
                     // add the neighbor pixel value to the sum
                     scalar_t* im1_p = im0 + neighbor_index;
