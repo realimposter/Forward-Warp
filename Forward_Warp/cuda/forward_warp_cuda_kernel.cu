@@ -91,7 +91,7 @@ __global__ void forward_mask_kernel(
     const int C,
     const int H,
     const int W) {
-    const int dilate_radius = 1;
+    const int dilate_radius = 2;
   CUDA_KERNEL_LOOP(index, total_step) {
     const int b = index / (H * W);
     const int h = (index-b*H*W) / W;
@@ -118,7 +118,6 @@ __global__ void forward_mask_kernel(
         flow[index*2+0] = flow[largest_loc*2+0];
         flow[index*2+1] = flow[largest_loc*2+1];
     }
-
 
 
     const scalar_t x = (scalar_t)w + flow[index*2+0];
@@ -305,45 +304,58 @@ at::Tensor forward_warp_cuda_forward(
   const int total_step = B * H * W;
   AT_DISPATCH_FLOATING_TYPES(input_image.scalar_type(), "forward_warp_forward_cuda", ([&] {
     
-    /////// WARP BACKWARDS //////////
-    back_warp_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      input_image.data_ptr<scalar_t>(),
-      flowback.data_ptr<scalar_t>(),
-      output_image.data_ptr<scalar_t>(),
-      B, C, H, W);
+    //// IF WE HAVE A BACKWARDS FLOW ////
+    if (flowback.data_ptr<scalar_t>() != nullptr) {
+        /////// WARP BACKWARDS //////////
+        back_warp_kernel<scalar_t>
+        <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+          total_step,
+          input_image.data_ptr<scalar_t>(),
+          flowback.data_ptr<scalar_t>(),
+          output_image.data_ptr<scalar_t>(),
+          B, C, H, W);
+    
+        /////// CREATE MASK FROM FORWARD WARP HOLES //////////
+        forward_mask_kernel<scalar_t>
+        <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+          total_step,
+          white.data_ptr<scalar_t>(),
+          flow.data_ptr<scalar_t>(),
+          mask.data_ptr<scalar_t>(),
+          B, C, H, W);
+    
+        /////// DIALATE MASK //////////
+        dialate_kernel<scalar_t>
+        <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+          total_step,
+          mask.data_ptr<scalar_t>(),
+          mask_dilation,
+          B, C, H, W);
+        
+        //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
+        output_image = at::where(isnan(mask), mask, output_image);
 
-    /////// CREATE MASK FROM FORWARD WARP HOLES //////////
-    forward_mask_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      white.data_ptr<scalar_t>(),
-      flow.data_ptr<scalar_t>(),
-      mask.data_ptr<scalar_t>(),
-      B, C, H, W);
-
-    /////// DIALATE MASK //////////
-    dialate_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      mask.data_ptr<scalar_t>(),
-      mask_dilation,
-      B, C, H, W);
-
-    //////// MASK BACKWARP WITH FORWARD WARP HOLES////////
-    output_image = at::where(isnan(mask), mask, output_image);
-
-    ///// INPAINT HOLES //////////
-    inpaint_nan_pixels_kernel<scalar_t>
-    <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
-      total_step,
-      output_image.data_ptr<scalar_t>(),
-      flowback.data_ptr<scalar_t>(),
-      inpaint_search_radius,
-      inpaint_motion_threshold,
-      max_iterations,
-      B, C, H, W);
+        ///// INPAINT HOLES //////////
+        inpaint_nan_pixels_kernel<scalar_t>
+        <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+          total_step,
+          output_image.data_ptr<scalar_t>(),
+          flowback.data_ptr<scalar_t>(),
+          inpaint_search_radius,
+          inpaint_motion_threshold,
+          max_iterations,
+          B, C, H, W);
+    }
+    else{
+        /////// FORWARD WARP //////////
+        forward_mask_kernel<scalar_t>
+        <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
+          total_step,
+          input_image.data_ptr<scalar_t>(),
+          flow.data_ptr<scalar_t>(),
+          output_image.data_ptr<scalar_t>(),
+          B, C, H, W);
+    }
 
   }));
   return output_image;
