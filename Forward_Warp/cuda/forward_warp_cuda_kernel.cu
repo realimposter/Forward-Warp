@@ -305,7 +305,7 @@ at::Tensor forward_warp_cuda_forward(
   AT_DISPATCH_FLOATING_TYPES(input_image.scalar_type(), "forward_warp_forward_cuda", ([&] {
     
     //// IF WE HAVE A BACKWARDS FLOW ////
-    if (flowback.data_ptr<scalar_t>() != nullptr) {
+    if (flowback.numel() != 0) {
         /////// WARP BACKWARDS //////////
         back_warp_kernel<scalar_t>
         <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
