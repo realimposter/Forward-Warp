@@ -432,10 +432,10 @@ at::Tensor forward_warp_cuda_forward(
         forward_warp_cuda_forward_kernel<scalar_t>
         <<<GET_BLOCKS(total_step), CUDA_NUM_THREADS>>>(
           total_step,
-          input_image.data<scalar_t>(),
-          flow.data<scalar_t>(),
-          output_image.data<scalar_t>(),
-          white.data<scalar_t>(), // added warped white image
+          input_image.data_ptr<scalar_t>(),
+          flow.data_ptr<scalar_t>(),
+          output_image.data_ptr<scalar_t>(),
+          white.data_ptr<scalar_t>(), // added warped white image
           B, C, H, W,
           interpolation_mode);
 
