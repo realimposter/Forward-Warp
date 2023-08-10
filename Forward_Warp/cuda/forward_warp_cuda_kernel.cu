@@ -71,9 +71,9 @@ __global__ void forward_warp_cuda_forward_kernel(
                 const scalar_t ne_k = (x - x_f) * (y_c - y);
                 const scalar_t sw_k = (x_c - x) * (y - y_f);
                 const scalar_t se_k = (x - x_f) * (y - y_f);
-                const scalar_t* im0_p = im0+get_im_index(b, 0, h, w, C, H, W);
-                scalar_t* im1_p = im1+get_im_index(b, 0, y_f, x_f, C, H, W);
-                scalar_t* white_im1_p = white_im1+get_im_index(b, 0, y_f, x_f, C, H, W); // added warped white image
+                const scalar_t* im0_p = im0+get_channel_index(b, 0, h, w, C, H, W);
+                scalar_t* im1_p = im1+get_channel_index(b, 0, y_f, x_f, C, H, W);
+                scalar_t* white_im1_p = white_im1+get_channel_index(b, 0, y_f, x_f, C, H, W); // added warped white image
                 for (int c = 0; c < C; ++c, im0_p+=H*W, im1_p+=H*W, white_im1_p+=H*W){
                     atomicAdd(im1_p,     nw_k*(*im0_p));
                     atomicAdd(im1_p+1,   ne_k*(*im0_p));
@@ -90,9 +90,9 @@ __global__ void forward_warp_cuda_forward_kernel(
             const int x_nearest = static_cast<int>(::round(x));
             const int y_nearest = static_cast<int>(::round(y));
             if (x_nearest >= 0 && x_nearest < W && y_nearest >= 0 && y_nearest < H) {
-                const scalar_t* im0_p = im0 + get_im_index(b, 0, h, w, C, H, W);
-                scalar_t* im1_p = im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W);
-                scalar_t* white_im1_p = white_im1 + get_im_index(b, 0, y_nearest, x_nearest, C, H, W); // added warped white image
+                const scalar_t* im0_p = im0 + get_channel_index(b, 0, h, w, C, H, W);
+                scalar_t* im1_p = im1 + get_channel_index(b, 0, y_nearest, x_nearest, C, H, W);
+                scalar_t* white_im1_p = white_im1 + get_channel_index(b, 0, y_nearest, x_nearest, C, H, W); // added warped white image
                 for (int c = 0; c < C; ++c, im0_p += H*W, im1_p += H*W, white_im1_p += H*W) {
                     *im1_p = *im0_p;
                     *white_im1_p = 1; // set pixel value to 1 for the warped white image
