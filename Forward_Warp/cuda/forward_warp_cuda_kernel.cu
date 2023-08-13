@@ -32,8 +32,9 @@ __global__ void forward_warp_cuda_forward_kernel(
     const int C,
     const int H,
     const int W,
-    const GridSamplerInterpolation interpolation_mode) {
-    int dilate_radius = 2; // Adjust the size for dilation here. 1 means 3x3 neighborhood.
+    const GridSamplerInterpolation interpolation_mode,
+    const int dilate_radius) {
+    // Adjust the size for dilation here. 1 means 3x3 neighborhood.
     CUDA_KERNEL_LOOP(index, total_step) {
         const int b = index / (H * W);
         const int h = (index-b*H*W) / W;
@@ -374,7 +375,8 @@ at::Tensor forward_warp_cuda_forward(
     const int inpaint_search_radius,
     const float inpaint_motion_threshold,
     const int max_iterations,
-    const int mask_dilation) {
+    const int mask_dilation,
+    const int dilate_radius) {
   auto output_image = at::zeros_like(input_image);
   auto white = at::ones_like(input_image);
   auto mask = at::zeros_like(input_image);
@@ -437,7 +439,8 @@ at::Tensor forward_warp_cuda_forward(
           output_image.data_ptr<scalar_t>(),
           white.data_ptr<scalar_t>(), // added warped white image
           B, C, H, W,
-          interpolation_mode);
+          interpolation_mode,
+          dilate_radius);
 
         // Divide warped main image by warped white image
         output_image.div_(white-1);
