@@ -8,7 +8,7 @@ from .python import Forward_Warp_Python
 class forward_warp_function(Function):
 
     @staticmethod
-    def forward(ctx, im0, flow, flowback=None, interpolation_mode=0, inpaint_search_radius=0, inpaint_motion_threshold=0.0, max_iterations=0, mask_dilation=0):
+    def forward(ctx, im0, flow, flowback=None, interpolation_mode=0, inpaint_search_radius=0, inpaint_motion_threshold=0.0, max_iterations=0, mask_dilation=0, dilate_radius=6):
         '''
         im0: the first image with shape [B, C, H, W]
         flow: the optical flow with shape [B, H, W, 2] (different to grid_sample, its range is from [-W, -H] to [W, H])
@@ -24,7 +24,7 @@ class forward_warp_function(Function):
         ctx.save_for_backward(im0, flow)
 
         # If flowback is None, you might need to adjust the CUDA function to handle it or provide a default tensor.
-        im1 = forward_warp_cuda.forward(im0, flow, flowback, interpolation_mode, inpaint_search_radius, inpaint_motion_threshold, max_iterations, mask_dilation)
+        im1 = forward_warp_cuda.forward(im0, flow, flowback, interpolation_mode, inpaint_search_radius, inpaint_motion_threshold, max_iterations, mask_dilation,dilate_radius)
         return im1
 
 class forward_warp(Module):
@@ -40,5 +40,5 @@ class forward_warp(Module):
         else:
             self.interpolation_mode = 1
 
-    def forward(self, im0, flow, flowback=None, inpaint_search_radius=0, inpaint_motion_threshold=0.0, max_iterations=0, mask_dilation=0):
-        return forward_warp_function.apply(im0, flow, flowback, self.interpolation_mode, inpaint_search_radius, inpaint_motion_threshold, max_iterations, mask_dilation)
+    def forward(self, im0, flow, flowback=None, inpaint_search_radius=0, inpaint_motion_threshold=0.0, max_iterations=0, mask_dilation=0,dilate_radius=6):
+        return forward_warp_function.apply(im0, flow, flowback, self.interpolation_mode, inpaint_search_radius, inpaint_motion_threshold, max_iterations, mask_dilation,dilate_radius)
