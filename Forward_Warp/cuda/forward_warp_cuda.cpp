@@ -12,7 +12,8 @@ at::Tensor forward_warp_cuda_forward(
     const int inpaint_search_radius,
     const float inpaint_motion_threshold,
     const int max_iterations,
-    const int mask_dilation);
+    const int mask_dilation,
+    const int dilate_radius);
 
 // Because of the incompatible of Pytorch 1.0 && Pytorch 0.4, we have to annotation this.
 #define CHECK_CUDA(x) AT_ASSERT(x.is_cuda(), #x " must be a CUDA tensor")
@@ -27,10 +28,11 @@ at::Tensor forward_warp_forward(
     const int inpaint_search_radius,
     const float inpaint_motion_threshold,
     const int max_iterations,
-    const int mask_dilation){
+    const int mask_dilation,
+    const int dilate_radius){
   // CHECK_INPUT(im0);
   // CHECK_INPUT(flow);
-  return forward_warp_cuda_forward(im0, flow, flowback, (GridSamplerInterpolation)interpolation_mode, inpaint_search_radius, inpaint_motion_threshold,max_iterations,mask_dilation);
+  return forward_warp_cuda_forward(im0, flow, flowback, (GridSamplerInterpolation)interpolation_mode, inpaint_search_radius, inpaint_motion_threshold,max_iterations,mask_dilation,dilate_radius);
 }
 
 PYBIND11_MODULE(
